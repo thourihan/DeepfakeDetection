@@ -68,18 +68,20 @@ class GradCam:
         cam = cam / np.max(cam)
         return cam
 
-def show_cam_on_image(img, mask):
+def show_cam_on_image(img, mask, alpha=0.6):
     # Resize mask to match the image size
     mask = cv2.resize(mask, (img.shape[1], img.shape[0]))
     heatmap = cv2.applyColorMap(np.uint8(255 * mask), cv2.COLORMAP_JET)
     heatmap = np.float32(heatmap) / 255
-    cam = heatmap + np.float32(img)
+
+    # Blend heatmap and image
+    cam = (1 - alpha) * np.float32(img) + alpha * heatmap
     cam = cam / np.max(cam)
     return np.uint8(255 * cam)
 
 
 # Process the image
-img_path = "EstevezFake1.jpg"
+img_path = "Biden.jpg"
 img = np.array(Image.open(img_path).convert('RGB'))
 img_tensor = process_image(img_path)
 
