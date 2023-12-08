@@ -79,7 +79,7 @@ def show_cam_on_image(img, mask):
 
 
 # Process the image
-img_path = "Biden.jpg"
+img_path = "EstevezFake1.jpg"
 img = np.array(Image.open(img_path).convert('RGB'))
 img_tensor = process_image(img_path)
 
@@ -88,6 +88,17 @@ grad_cam = GradCam(model, '_conv_head')
 target_class = torch.argmax(model(img_tensor)).item()
 cam = grad_cam.generate_cam(img_tensor, target_class)
 cam_image = show_cam_on_image(img / 255.0, cam)
+
+# Make prediction
+logits = model(img_tensor)
+probabilities = F.softmax(logits, dim=1)
+predicted_class = torch.argmax(probabilities, dim=1).item()
+
+# Map the numeric prediction to a label
+class_labels = {0: "real", 1: "fake"}
+predicted_label = class_labels[predicted_class]
+
+print(f"Predicted class: {predicted_label}")
 
 # Display image
 plt.imshow(cam_image)
