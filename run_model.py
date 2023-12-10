@@ -37,6 +37,7 @@ def predict_and_visualize(image):
     logits = model(img_tensor)
     probabilities = F.softmax(logits, dim=1)
     predicted_class = torch.argmax(probabilities, dim=1).item()
+    confidence = probabilities[0][predicted_class].item() * 100  # Convert to percentage
 
     # Map the numeric prediction to a label
     class_labels = {0: "real", 1: "fake"}
@@ -52,7 +53,7 @@ def predict_and_visualize(image):
     result_image = np.transpose(result.numpy(), (1, 2, 0))
     result_image = np.clip(result_image, 0, 1)
 
-    return result_image, predicted_label
+    return result_image, f"{predicted_label} ({confidence:.2f}% confidence)"
 
 # Gradio interface
 iface = gr.Interface(
