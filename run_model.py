@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import cv2
 from gradcam.utils import visualize_cam
 from gradcam import GradCAM, GradCAMpp
+import gradio as gr
 
 # Initialize model architecture with EfficientNet B3
 model = EfficientNet.from_pretrained('efficientnet-b3')
@@ -19,8 +20,7 @@ model.load_state_dict(torch.load("model_after_test.pth", map_location=torch.devi
 model.eval()
 
 # Preparing image
-def process_image(image_path):
-    image = Image.open(image_path).convert('RGB')
+def process_image(image):
     preprocess = transforms.Compose([
         transforms.Resize(256),
         transforms.CenterCrop(224),
@@ -29,27 +29,38 @@ def process_image(image_path):
     ])
     return preprocess(image).unsqueeze(0)
 
-# Process the image
-img_path = "Fake.jpg"
-img_tensor = process_image(img_path)
+# Function to predict and generate heatmap
+def predict_and_visualize(image):
+    img_tensor = process_image(image)
 
-# Make prediction
-logits = model(img_tensor)
-probabilities = F.softmax(logits, dim=1)
-predicted_class = torch.argmax(probabilities, dim=1).item()
+    # Make prediction
+    logits = model(img_tensor)
+    probabilities = F.softmax(logits, dim=1)
+    predicted_class = torch.argmax(probabilities, dim=1).item()
 
-# Map the numeric prediction to a label
-class_labels = {0: "real", 1: "fake"}
-predicted_label = class_labels[predicted_class]
+    # Map the numeric prediction to a label
+    class_labels = {0: "real", 1: "fake"}
+    predicted_label = class_labels[predicted_class]
 
-print(f"Predicted class: {predicted_label}")
+    # Grad-CAM
+    target_layer = model._conv_head
+    grad_cam = GradCAM(model, target_layer)
+    mask, _ = grad_cam(img_tensor)
+    heatmap, result = visualize_cam(mask, img_tensor)
 
-# Grad-CAM
-target_layer = model._conv_head
-grad_cam = GradCAM(model, target_layer)
-mask, _ = grad_cam(img_tensor)
-heatmap, result = visualize_cam(mask, img_tensor)
+    # Convert to displayable format
+    result_image = np.transpose(result.numpy(), (1, 2, 0))
+    result_image = np.clip(result_image, 0, 1)
 
-# Display image
-plt.imshow(np.transpose(result.numpy(), (1, 2, 0)))
-plt.show()
+    return result_image, predicted_label
+
+# Gradio interface
+iface = gr.Interface(
+    fn=predict_and_visualize,
+    inputs=gr.Image(type="pil"),
+    outputs=[gr.Image(type="numpy"), "text"],
+    title="Real vs Fake Face Detection",
+    description="Upload an image to determine if the face is real or fake."
+)
+
+iface.launch()
