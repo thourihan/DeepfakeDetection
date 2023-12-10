@@ -40,7 +40,7 @@ def predict_and_visualize(image):
     confidence = probabilities[0][predicted_class].item() * 100  # Convert to percentage
 
     # Map the numeric prediction to a label
-    class_labels = {0: "real", 1: "fake"}
+    class_labels = {0: "fake", 1: "real"}
     predicted_label = class_labels[predicted_class]
 
     # Grad-CAM
