@@ -3,6 +3,8 @@
 ## Project Overview
 In this project, we used EfficientNet and FasterViT to detect deepfake images from real ones. Deepfakes pose significant challenges in the realms of security, privacy, and information integrity. Our goal was to develop a robust model capable of accurately distinguishing between real and deep fake images by using the latest advancements in machine learning and image processing.
 
+You can also find some runs on WandB, we are hoping to implement a more excessive hyperparameter sweep feature in the future: https://wandb.ai/461
+
 ## Features
 - **EfficientNet and FasterViT Models:** Utilizes pre-trained EfficientNet and FasterViT models to classify images as "real" or "fake".
 - **Gradio Interface:** Provides an easy-to-use web interface for uploading images and viewing predictions.
