@@ -14,7 +14,10 @@ To set up the project, follow these steps:
 2. Install dependencies:
 Make sure you have Python installed on your system, we used Python 3.11.6. Install the required packages using `pip install -r requirements.txt`
 3. Train the models:
-Optimally, you would be able to download our EfficientNetModel.pth and FasterVitModel.pth files which have already been generated from the training scripts. However, GitHub does not allow files that big to be stored, so you will have to train the models yourself with train_model.ipynb (for EfficientNet) and train_model_fastervit.ipynb (for FasterViT).
+We have provided pre-trained model files for your convenience. You can download our EfficientNetModel.pth and FasterVitModel.pth files from the following Google Drive links:
+    - EfficientNetModel.pth: [Download Here](https://drive.google.com/file/d/1xVW50FY02utzv_ux-474tNXU8d7giKkD/view?usp=sharing)
+    - FasterVitModel.pth: [Download Here](https://drive.google.com/file/d/120Lz6ueJEPzhTHkxA58kmwtU6IY6O6NX/view?usp=sharing)
+    - Note: If you prefer to train the models yourself, you can use the train_model.ipynb (for EfficientNet) and train_model_fastervit.ipynb (for FasterViT).
 4. Run the Application:
 To start the Gradio web interface, run `python run_model.py`
 
