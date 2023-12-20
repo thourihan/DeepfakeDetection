@@ -1,7 +1,7 @@
 # CSC 461 Final: Deepfake Image Detection with EfficientNet and FasterViT
 
 ## Project Overview
-In this project, we used EfficientNEt and FasterViT to detect deepfake images from real ones. Deepfakes pose significant challenges in the realms of security, privacy, and information integrity. Our goal was to develop a robust model capable of accurately distinguishing between real and deep fake images by using the latest advancements in machine learning and image processing.
+In this project, we used EfficientNet and FasterViT to detect deepfake images from real ones. Deepfakes pose significant challenges in the realms of security, privacy, and information integrity. Our goal was to develop a robust model capable of accurately distinguishing between real and deep fake images by using the latest advancements in machine learning and image processing.
 
 ## Features
 - **EfficientNet and FasterViT Models:** Utilizes pre-trained EfficientNet and FasterViT models to classify images as "real" or "fake".
@@ -25,5 +25,5 @@ After launching the application, navigate to the Gradio web URL displayed in you
 3. **Heatmap Visualization:** Alongside the predictions, a heatmap overlay on the image will be displayed, showing the areas most influential in the model's decision.
 
 ## Dataset
-The models are trained on a dataset available on Kaggle: Deepfake and Real Images (https://www.kaggle.com/datasets/manjilkarki/deepfake-and-real-images). Make sure you download and place the dataset in the appropriate directory before running the training notebooks.
+The models are trained on a dataset available on Kaggle: [Deepfake and Real Images](https://www.kaggle.com/datasets/manjilkarki/deepfake-and-real-images). Make sure you download and place the dataset in the appropriate directory before running the training notebooks.
 
