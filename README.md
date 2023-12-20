@@ -8,6 +8,21 @@ In this project, we used EfficientNet and FasterViT to detect deepfake images fr
 - **Gradio Interface:** Provides an easy-to-use web interface for uploading images and viewing predictions.
 - **Heatmap Visualization:** Generates heatmaps for each image to show what the model is "looking at" using Grad-CAM.
 
+## Sample Predictions and Heatmap Visualizations 
+Here are some examples of the model's output, along with its heatmap visualizations.
+
+### Deepfake Detection Example
+- **Mark Zuckerberg (Deepfake Image)**
+  <img src="images/mark-zuckerberg-deepfake.webp" alt="Mark Zuckerberg Deepfake" width="224" height="224"/>
+- **Heatmap Visualization**
+  <img src="images/mark-zuckerberg-deepfake-heatmap.png" alt="Heatmap of Mark Zuckerberg Deepfake" width="224" height="224"/>
+
+### Real Image Detection Example
+- **Donald Trump (Real Image)**
+  <img src="images/donald-trump-real.jpg" alt="Donald Trump Real" width="224" height="224"/>
+- **Heatmap Visualization**
+  <img src="images/donald-trump-real-heatmap.png" alt="Heatmap of Donald Trump Real" width="224" height="224"/>
+
 ## Installation
 To set up the project, follow these steps:
 1. Clone the Repository
