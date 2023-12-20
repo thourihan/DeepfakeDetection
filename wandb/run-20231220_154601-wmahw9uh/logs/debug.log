@@ -17,3 +17,22 @@ config: {}
 2023-12-20 15:46:01,786 INFO    MainThread:10460 [wandb_run.py:_atexit_cleanup():2202] got exitcode: 0
 2023-12-20 15:46:01,787 INFO    MainThread:10460 [wandb_run.py:_restore():2185] restore
 2023-12-20 15:46:01,787 INFO    MainThread:10460 [wandb_run.py:_restore():2191] restore done
+2023-12-20 15:46:06,009 INFO    MainThread:10460 [wandb_run.py:_footer_history_summary_info():3837] rendering history
+2023-12-20 15:46:06,009 INFO    MainThread:10460 [wandb_run.py:_footer_history_summary_info():3869] rendering summary
+2023-12-20 15:46:06,015 INFO    MainThread:10460 [wandb_run.py:_footer_sync_info():3796] logging synced files
+2023-12-20 15:46:06,129 INFO    MainThread:10460 [wandb_init.py:init():614] starting backend
+2023-12-20 15:46:06,129 INFO    MainThread:10460 [wandb_init.py:init():618] setting up manager
+2023-12-20 15:46:06,133 INFO    MainThread:10460 [backend.py:_multiprocessing_setup():105] multiprocessing start_methods=spawn, using: spawn
+2023-12-20 15:46:06,134 INFO    MainThread:10460 [wandb_init.py:init():624] backend started and connected
+2023-12-20 15:46:06,139 INFO    MainThread:10460 [wandb_run.py:_label_probe_notebook():1294] probe notebook
+2023-12-20 15:46:06,139 INFO    MainThread:10460 [wandb_run.py:_label_probe_notebook():1304] Unable to probe notebook: 'NoneType' object has no attribute 'get'
+2023-12-20 15:46:06,139 INFO    MainThread:10460 [wandb_init.py:init():716] updated telemetry
+2023-12-20 15:46:06,201 INFO    MainThread:10460 [wandb_init.py:init():749] communicating run to backend with 90.0 second timeout
+2023-12-20 15:46:07,758 INFO    MainThread:10460 [wandb_run.py:_on_init():2254] communicating current version
+2023-12-20 15:46:07,846 INFO    MainThread:10460 [wandb_run.py:_on_init():2263] got version response 
+2023-12-20 15:46:07,846 INFO    MainThread:10460 [wandb_init.py:init():800] starting run threads in backend
+2023-12-20 15:46:08,070 INFO    MainThread:10460 [wandb_run.py:_console_start():2233] atexit reg
+2023-12-20 15:46:08,070 INFO    MainThread:10460 [wandb_run.py:_redirect():2088] redirect: wrap_raw
+2023-12-20 15:46:08,071 INFO    MainThread:10460 [wandb_run.py:_redirect():2153] Wrapping output streams.
+2023-12-20 15:46:08,071 INFO    MainThread:10460 [wandb_run.py:_redirect():2178] Redirects installed.
+2023-12-20 15:46:08,071 INFO    MainThread:10460 [wandb_init.py:init():841] run started, returning control to user process
