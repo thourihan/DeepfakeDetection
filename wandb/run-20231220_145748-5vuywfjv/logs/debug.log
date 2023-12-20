@@ -1,0 +1,58 @@
+2023-12-20 14:57:48,046 INFO    MainThread:10460 [wandb_setup.py:_flush():76] Current SDK version is 0.16.1
+2023-12-20 14:57:48,046 INFO    MainThread:10460 [wandb_setup.py:_flush():76] Configure stats pid to 10460
+2023-12-20 14:57:48,046 INFO    MainThread:10460 [wandb_setup.py:_flush():76] Loading settings from C:\Users\devin\.config\wandb\settings
+2023-12-20 14:57:48,047 INFO    MainThread:10460 [wandb_setup.py:_flush():76] Loading settings from c:\Users\devin\OneDrive - University of Rhode Island\URI\Junior\Junior Sem 1\CSC461\CSC461-FinalProj\CSC461_Final\wandb\settings
+2023-12-20 14:57:48,047 INFO    MainThread:10460 [wandb_setup.py:_flush():76] Loading settings from environment variables: {}
+2023-12-20 14:57:48,047 INFO    MainThread:10460 [wandb_setup.py:_flush():76] Inferring run settings from compute environment: {'program': '<python with no main file>'}
+2023-12-20 14:57:48,047 INFO    MainThread:10460 [wandb_init.py:_log_setup():524] Logging user logs to c:\Users\devin\OneDrive - University of Rhode Island\URI\Junior\Junior Sem 1\CSC461\CSC461-FinalProj\CSC461_Final\wandb\run-20231220_145748-5vuywfjv\logs\debug.log
+2023-12-20 14:57:48,048 INFO    MainThread:10460 [wandb_init.py:_log_setup():525] Logging internal logs to c:\Users\devin\OneDrive - University of Rhode Island\URI\Junior\Junior Sem 1\CSC461\CSC461-FinalProj\CSC461_Final\wandb\run-20231220_145748-5vuywfjv\logs\debug-internal.log
+2023-12-20 14:57:48,048 INFO    MainThread:10460 [wandb_init.py:init():564] calling init triggers
+2023-12-20 14:57:48,048 INFO    MainThread:10460 [wandb_init.py:init():571] wandb.init called with sweep_config: {}
+config: {}
+2023-12-20 14:57:48,048 INFO    MainThread:10460 [wandb_init.py:init():589] re-initializing run, found existing run on stack: plb7v7rw
+2023-12-20 14:57:48,050 INFO    MainThread:10460 [wandb_run.py:_finish():1962] finishing run devinhunsberger/CSC461_Final/plb7v7rw
+2023-12-20 14:57:48,052 ERROR   MainThread:10460 [jupyter.py:save_history():437] Run pip install nbformat to save notebook history
+2023-12-20 14:57:48,053 INFO    MainThread:10460 [jupyter.py:save_ipynb():373] not saving jupyter notebook
+2023-12-20 14:57:48,053 INFO    MainThread:10460 [wandb_init.py:_jupyter_teardown():452] cleaning up jupyter logic
+2023-12-20 14:57:48,053 INFO    MainThread:10460 [wandb_run.py:_atexit_cleanup():2202] got exitcode: 0
+2023-12-20 14:57:48,054 INFO    MainThread:10460 [wandb_run.py:_restore():2185] restore
+2023-12-20 14:57:48,054 INFO    MainThread:10460 [wandb_run.py:_restore():2191] restore done
+2023-12-20 14:57:52,699 INFO    MainThread:10460 [wandb_run.py:_footer_history_summary_info():3837] rendering history
+2023-12-20 14:57:52,699 INFO    MainThread:10460 [wandb_run.py:_footer_history_summary_info():3869] rendering summary
+2023-12-20 14:57:52,713 INFO    MainThread:10460 [wandb_run.py:_footer_sync_info():3796] logging synced files
+2023-12-20 14:57:52,804 INFO    MainThread:10460 [wandb_init.py:init():614] starting backend
+2023-12-20 14:57:52,805 INFO    MainThread:10460 [wandb_init.py:init():618] setting up manager
+2023-12-20 14:57:52,807 INFO    MainThread:10460 [backend.py:_multiprocessing_setup():105] multiprocessing start_methods=spawn, using: spawn
+2023-12-20 14:57:52,807 INFO    MainThread:10460 [wandb_init.py:init():624] backend started and connected
+2023-12-20 14:57:52,812 INFO    MainThread:10460 [wandb_run.py:_label_probe_notebook():1294] probe notebook
+2023-12-20 14:57:52,812 INFO    MainThread:10460 [wandb_run.py:_label_probe_notebook():1304] Unable to probe notebook: 'NoneType' object has no attribute 'get'
+2023-12-20 14:57:52,812 INFO    MainThread:10460 [wandb_init.py:init():716] updated telemetry
+2023-12-20 14:57:52,867 INFO    MainThread:10460 [wandb_init.py:init():749] communicating run to backend with 90.0 second timeout
+2023-12-20 14:57:54,032 INFO    MainThread:10460 [wandb_run.py:_on_init():2254] communicating current version
+2023-12-20 14:57:54,117 INFO    MainThread:10460 [wandb_run.py:_on_init():2263] got version response 
+2023-12-20 14:57:54,117 INFO    MainThread:10460 [wandb_init.py:init():800] starting run threads in backend
+2023-12-20 14:57:54,320 INFO    MainThread:10460 [wandb_run.py:_console_start():2233] atexit reg
+2023-12-20 14:57:54,320 INFO    MainThread:10460 [wandb_run.py:_redirect():2088] redirect: wrap_raw
+2023-12-20 14:57:54,320 INFO    MainThread:10460 [wandb_run.py:_redirect():2153] Wrapping output streams.
+2023-12-20 14:57:54,321 INFO    MainThread:10460 [wandb_run.py:_redirect():2178] Redirects installed.
+2023-12-20 14:57:54,321 INFO    MainThread:10460 [wandb_init.py:init():841] run started, returning control to user process
+2023-12-20 14:59:09,966 INFO    MainThread:10460 [wandb_setup.py:_flush():76] Current SDK version is 0.16.1
+2023-12-20 14:59:09,966 INFO    MainThread:10460 [wandb_setup.py:_flush():76] Configure stats pid to 10460
+2023-12-20 14:59:09,966 INFO    MainThread:10460 [wandb_setup.py:_flush():76] Loading settings from C:\Users\devin\.config\wandb\settings
+2023-12-20 14:59:09,966 INFO    MainThread:10460 [wandb_setup.py:_flush():76] Loading settings from c:\Users\devin\OneDrive - University of Rhode Island\URI\Junior\Junior Sem 1\CSC461\CSC461-FinalProj\CSC461_Final\wandb\settings
+2023-12-20 14:59:09,966 INFO    MainThread:10460 [wandb_setup.py:_flush():76] Loading settings from environment variables: {}
+2023-12-20 14:59:09,966 INFO    MainThread:10460 [wandb_setup.py:_flush():76] Inferring run settings from compute environment: {'program': '<python with no main file>'}
+2023-12-20 14:59:09,967 INFO    MainThread:10460 [wandb_init.py:_log_setup():524] Logging user logs to c:\Users\devin\OneDrive - University of Rhode Island\URI\Junior\Junior Sem 1\CSC461\CSC461-FinalProj\CSC461_Final\wandb\run-20231220_145909-brok5y4f\logs\debug.log
+2023-12-20 14:59:09,967 INFO    MainThread:10460 [wandb_init.py:_log_setup():525] Logging internal logs to c:\Users\devin\OneDrive - University of Rhode Island\URI\Junior\Junior Sem 1\CSC461\CSC461-FinalProj\CSC461_Final\wandb\run-20231220_145909-brok5y4f\logs\debug-internal.log
+2023-12-20 14:59:09,968 INFO    MainThread:10460 [wandb_init.py:_jupyter_setup():470] configuring jupyter hooks <wandb.sdk.wandb_init._WandbInit object at 0x00000238ECEB3C10>
+2023-12-20 14:59:09,968 INFO    MainThread:10460 [wandb_init.py:init():564] calling init triggers
+2023-12-20 14:59:09,968 INFO    MainThread:10460 [wandb_init.py:init():571] wandb.init called with sweep_config: {}
+config: {}
+2023-12-20 14:59:09,968 INFO    MainThread:10460 [wandb_init.py:init():589] re-initializing run, found existing run on stack: 5vuywfjv
+2023-12-20 14:59:09,971 INFO    MainThread:10460 [wandb_run.py:_finish():1962] finishing run devinhunsberger/CSC461_Final/5vuywfjv
+2023-12-20 14:59:09,971 INFO    MainThread:10460 [wandb_run.py:_atexit_cleanup():2202] got exitcode: 0
+2023-12-20 14:59:09,972 INFO    MainThread:10460 [wandb_run.py:_restore():2185] restore
+2023-12-20 14:59:09,972 INFO    MainThread:10460 [wandb_run.py:_restore():2191] restore done
+2023-12-20 14:59:13,672 INFO    MainThread:10460 [wandb_run.py:_footer_history_summary_info():3837] rendering history
+2023-12-20 14:59:13,672 INFO    MainThread:10460 [wandb_run.py:_footer_history_summary_info():3869] rendering summary
+2023-12-20 14:59:13,680 INFO    MainThread:10460 [wandb_run.py:_footer_sync_info():3796] logging synced files

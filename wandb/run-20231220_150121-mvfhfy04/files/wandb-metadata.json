@@ -1,0 +1,52 @@
+{
+    "os": "Windows-10-10.0.22621-SP0",
+    "python": "3.10.11",
+    "heartbeatAt": "2023-12-20T20:01:27.259308",
+    "startedAt": "2023-12-20T20:01:21.198851",
+    "docker": null,
+    "cuda": null,
+    "args": [],
+    "state": "running",
+    "program": "<python with no main file>",
+    "codePathLocal": null,
+    "git": {
+        "remote": "https://github.com/thourihan/CSC461_Final.git",
+        "commit": "2797d4a98642aab50088d08de5e432c82b4faea1"
+    },
+    "email": "devinhunsberger@yahoo.com",
+    "root": "C:/Users/devin/OneDrive - University of Rhode Island/URI/Junior/Junior Sem 1/CSC461/CSC461-FinalProj/CSC461_Final",
+    "host": "DESKTOP-GE6CSFI",
+    "username": "devin",
+    "executable": "c:\\Users\\devin\\AppData\\Local\\Programs\\Python\\Python310\\python.exe",
+    "cpu_count": 8,
+    "cpu_count_logical": 16,
+    "cpu_freq": {
+        "current": 2208.0,
+        "min": 0.0,
+        "max": 2208.0
+    },
+    "cpu_freq_per_core": [
+        {
+            "current": 2208.0,
+            "min": 0.0,
+            "max": 2208.0
+        }
+    ],
+    "disk": {
+        "/": {
+            "total": 376.99120712280273,
+            "used": 292.8159713745117
+        }
+    },
+    "gpu": "NVIDIA GeForce RTX 3060 Laptop GPU",
+    "gpu_count": 1,
+    "gpu_devices": [
+        {
+            "name": "NVIDIA GeForce RTX 3060 Laptop GPU",
+            "memory_total": 6442450944
+        }
+    ],
+    "memory": {
+        "total": 15.780036926269531
+    }
+}

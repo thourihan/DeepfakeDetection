@@ -1,0 +1,4 @@
+
+[34m[1mwandb[39m[22m: [32m[41mERROR[39m[49m Error while calling W&B API: Invalid sweep config: invalid hyperparameter configuration: dropout_rate (<Response [400]>)
+[34m[1mwandb[39m[22m: [32m[41mERROR[39m[49m Error while calling W&B API: Invalid sweep config: invalid hyperparameter configuration: dropout_rate (<Response [400]>)
+Loaded pretrained weights for efficientnet-b3

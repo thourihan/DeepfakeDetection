@@ -1,0 +1,261 @@
+2023-12-20 15:00:52,028 INFO    StreamThr :6048 [internal.py:wandb_internal():86] W&B internal server running at pid: 6048, started at: 2023-12-20 15:00:52.028121
+2023-12-20 15:00:52,030 DEBUG   HandlerThread:6048 [handler.py:handle_request():146] handle_request: status
+2023-12-20 15:00:52,032 INFO    WriterThread:6048 [datastore.py:open_for_write():85] open: c:\Users\devin\OneDrive - University of Rhode Island\URI\Junior\Junior Sem 1\CSC461\CSC461-FinalProj\CSC461_Final\wandb\run-20231220_150046-ak87xsw9\run-ak87xsw9.wandb
+2023-12-20 15:00:52,034 DEBUG   SenderThread:6048 [sender.py:send():382] send: header
+2023-12-20 15:00:52,039 DEBUG   SenderThread:6048 [sender.py:send():382] send: run
+2023-12-20 15:00:52,487 INFO    SenderThread:6048 [dir_watcher.py:__init__():211] watching files in: c:\Users\devin\OneDrive - University of Rhode Island\URI\Junior\Junior Sem 1\CSC461\CSC461-FinalProj\CSC461_Final\wandb\run-20231220_150046-ak87xsw9\files
+2023-12-20 15:00:52,487 INFO    SenderThread:6048 [sender.py:_start_run_threads():1136] run started: ak87xsw9 with start time 1703102451.066501
+2023-12-20 15:00:52,503 DEBUG   HandlerThread:6048 [handler.py:handle_request():146] handle_request: check_version
+2023-12-20 15:00:52,504 DEBUG   SenderThread:6048 [sender.py:send_request():409] send_request: check_version
+2023-12-20 15:00:52,577 DEBUG   HandlerThread:6048 [handler.py:handle_request():146] handle_request: run_start
+2023-12-20 15:00:52,598 DEBUG   HandlerThread:6048 [system_info.py:__init__():32] System info init
+2023-12-20 15:00:52,598 DEBUG   HandlerThread:6048 [system_info.py:__init__():47] System info init done
+2023-12-20 15:00:52,598 INFO    HandlerThread:6048 [system_monitor.py:start():194] Starting system monitor
+2023-12-20 15:00:52,598 INFO    SystemMonitor:6048 [system_monitor.py:_start():158] Starting system asset monitoring threads
+2023-12-20 15:00:52,598 INFO    HandlerThread:6048 [system_monitor.py:probe():214] Collecting system info
+2023-12-20 15:00:52,606 INFO    SystemMonitor:6048 [interfaces.py:start():190] Started cpu monitoring
+2023-12-20 15:00:52,606 INFO    SystemMonitor:6048 [interfaces.py:start():190] Started disk monitoring
+2023-12-20 15:00:52,607 INFO    SystemMonitor:6048 [interfaces.py:start():190] Started gpu monitoring
+2023-12-20 15:00:52,621 DEBUG   HandlerThread:6048 [system_info.py:probe():196] Probing system
+2023-12-20 15:00:52,635 INFO    SystemMonitor:6048 [interfaces.py:start():190] Started memory monitoring
+2023-12-20 15:00:52,654 INFO    SystemMonitor:6048 [interfaces.py:start():190] Started network monitoring
+2023-12-20 15:00:52,655 DEBUG   HandlerThread:6048 [system_info.py:_probe_git():181] Probing git
+2023-12-20 15:00:52,759 DEBUG   HandlerThread:6048 [system_info.py:_probe_git():189] Probing git done
+2023-12-20 15:00:52,759 DEBUG   HandlerThread:6048 [system_info.py:probe():244] Probing system done
+2023-12-20 15:00:52,759 DEBUG   HandlerThread:6048 [system_monitor.py:probe():223] {'os': 'Windows-10-10.0.22621-SP0', 'python': '3.10.11', 'heartbeatAt': '2023-12-20T20:00:52.622281', 'startedAt': '2023-12-20T20:00:46.827430', 'docker': None, 'cuda': None, 'args': (), 'state': 'running', 'program': '<python with no main file>', 'codePathLocal': None, 'git': {'remote': 'https://github.com/thourihan/CSC461_Final.git', 'commit': '2797d4a98642aab50088d08de5e432c82b4faea1'}, 'email': 'devinhunsberger@yahoo.com', 'root': 'C:/Users/devin/OneDrive - University of Rhode Island/URI/Junior/Junior Sem 1/CSC461/CSC461-FinalProj/CSC461_Final', 'host': 'DESKTOP-GE6CSFI', 'username': 'devin', 'executable': 'c:\\Users\\devin\\AppData\\Local\\Programs\\Python\\Python310\\python.exe', 'cpu_count': 8, 'cpu_count_logical': 16, 'cpu_freq': {'current': 2208.0, 'min': 0.0, 'max': 2208.0}, 'cpu_freq_per_core': [{'current': 2208.0, 'min': 0.0, 'max': 2208.0}], 'disk': {'/': {'total': 376.99120712280273, 'used': 292.8135299682617}}, 'gpu': 'NVIDIA GeForce RTX 3060 Laptop GPU', 'gpu_count': 1, 'gpu_devices': [{'name': 'NVIDIA GeForce RTX 3060 Laptop GPU', 'memory_total': 6442450944}], 'memory': {'total': 15.780036926269531}}
+2023-12-20 15:00:52,760 INFO    HandlerThread:6048 [system_monitor.py:probe():224] Finished collecting system info
+2023-12-20 15:00:52,760 INFO    HandlerThread:6048 [system_monitor.py:probe():227] Publishing system info
+2023-12-20 15:00:52,760 DEBUG   HandlerThread:6048 [system_info.py:_save_pip():52] Saving list of pip packages installed into the current environment
+2023-12-20 15:00:52,763 DEBUG   HandlerThread:6048 [system_info.py:_save_pip():68] Saving pip packages done
+2023-12-20 15:00:52,765 INFO    HandlerThread:6048 [system_monitor.py:probe():229] Finished publishing system info
+2023-12-20 15:00:52,766 DEBUG   SenderThread:6048 [sender.py:send():382] send: files
+2023-12-20 15:00:52,766 INFO    SenderThread:6048 [sender.py:_save_file():1392] saving file wandb-metadata.json with policy now
+2023-12-20 15:00:52,783 DEBUG   HandlerThread:6048 [handler.py:handle_request():146] handle_request: stop_status
+2023-12-20 15:00:52,783 DEBUG   SenderThread:6048 [sender.py:send_request():409] send_request: stop_status
+2023-12-20 15:00:52,784 DEBUG   HandlerThread:6048 [handler.py:handle_request():146] handle_request: internal_messages
+2023-12-20 15:00:52,797 DEBUG   HandlerThread:6048 [handler.py:handle_request():146] handle_request: pause
+2023-12-20 15:00:52,798 INFO    HandlerThread:6048 [handler.py:handle_request_pause():705] stopping system metrics thread
+2023-12-20 15:00:52,798 INFO    HandlerThread:6048 [system_monitor.py:finish():203] Stopping system monitor
+2023-12-20 15:00:52,799 DEBUG   SystemMonitor:6048 [system_monitor.py:_start():172] Starting system metrics aggregation loop
+2023-12-20 15:00:52,800 DEBUG   SystemMonitor:6048 [system_monitor.py:_start():179] Finished system metrics aggregation loop
+2023-12-20 15:00:52,800 DEBUG   SystemMonitor:6048 [system_monitor.py:_start():183] Publishing last batch of metrics
+2023-12-20 15:00:52,816 INFO    HandlerThread:6048 [interfaces.py:finish():202] Joined cpu monitor
+2023-12-20 15:00:52,816 INFO    HandlerThread:6048 [interfaces.py:finish():202] Joined disk monitor
+2023-12-20 15:00:52,923 INFO    HandlerThread:6048 [interfaces.py:finish():202] Joined gpu monitor
+2023-12-20 15:00:52,923 INFO    HandlerThread:6048 [interfaces.py:finish():202] Joined memory monitor
+2023-12-20 15:00:52,923 INFO    HandlerThread:6048 [interfaces.py:finish():202] Joined network monitor
+2023-12-20 15:00:52,929 DEBUG   SenderThread:6048 [sender.py:send():382] send: telemetry
+2023-12-20 15:00:52,929 DEBUG   SenderThread:6048 [sender.py:send():382] send: stats
+2023-12-20 15:00:53,109 INFO    wandb-upload_0:6048 [upload_job.py:push():131] Uploaded file C:\Users\devin\AppData\Local\Temp\tmpo3dclmaowandb\koneo6q7-wandb-metadata.json
+2023-12-20 15:00:53,493 INFO    Thread-83 :6048 [dir_watcher.py:_on_file_created():271] file/dir created: c:\Users\devin\OneDrive - University of Rhode Island\URI\Junior\Junior Sem 1\CSC461\CSC461-FinalProj\CSC461_Final\wandb\run-20231220_150046-ak87xsw9\files\wandb-metadata.json
+2023-12-20 15:00:53,494 INFO    Thread-83 :6048 [dir_watcher.py:_on_file_created():271] file/dir created: c:\Users\devin\OneDrive - University of Rhode Island\URI\Junior\Junior Sem 1\CSC461\CSC461-FinalProj\CSC461_Final\wandb\run-20231220_150046-ak87xsw9\files\requirements.txt
+2023-12-20 15:00:53,914 DEBUG   HandlerThread:6048 [handler.py:handle_request():146] handle_request: resume
+2023-12-20 15:00:53,915 INFO    HandlerThread:6048 [handler.py:handle_request_resume():696] starting system metrics thread
+2023-12-20 15:00:53,915 INFO    HandlerThread:6048 [system_monitor.py:start():194] Starting system monitor
+2023-12-20 15:00:53,915 INFO    SystemMonitor:6048 [system_monitor.py:_start():158] Starting system asset monitoring threads
+2023-12-20 15:00:53,925 INFO    SystemMonitor:6048 [interfaces.py:start():190] Started cpu monitoring
+2023-12-20 15:00:53,925 DEBUG   HandlerThread:6048 [handler.py:handle_request():146] handle_request: pause
+2023-12-20 15:00:53,925 INFO    HandlerThread:6048 [handler.py:handle_request_pause():705] stopping system metrics thread
+2023-12-20 15:00:53,926 INFO    HandlerThread:6048 [system_monitor.py:finish():203] Stopping system monitor
+2023-12-20 15:00:53,926 INFO    HandlerThread:6048 [interfaces.py:finish():202] Joined cpu monitor
+2023-12-20 15:00:53,926 INFO    SystemMonitor:6048 [interfaces.py:start():190] Started disk monitoring
+2023-12-20 15:00:53,926 DEBUG   SystemMonitor:6048 [system_monitor.py:_start():172] Starting system metrics aggregation loop
+2023-12-20 15:00:53,926 DEBUG   SystemMonitor:6048 [system_monitor.py:_start():179] Finished system metrics aggregation loop
+2023-12-20 15:00:53,926 DEBUG   SystemMonitor:6048 [system_monitor.py:_start():183] Publishing last batch of metrics
+2023-12-20 15:00:53,927 INFO    HandlerThread:6048 [interfaces.py:finish():202] Joined disk monitor
+2023-12-20 15:00:53,928 DEBUG   SenderThread:6048 [sender.py:send():382] send: stats
+2023-12-20 15:00:56,528 DEBUG   HandlerThread:6048 [handler.py:handle_request():146] handle_request: resume
+2023-12-20 15:00:56,528 INFO    HandlerThread:6048 [handler.py:handle_request_resume():696] starting system metrics thread
+2023-12-20 15:00:56,528 INFO    HandlerThread:6048 [system_monitor.py:start():194] Starting system monitor
+2023-12-20 15:00:56,528 INFO    SystemMonitor:6048 [system_monitor.py:_start():158] Starting system asset monitoring threads
+2023-12-20 15:00:56,539 INFO    SystemMonitor:6048 [interfaces.py:start():190] Started cpu monitoring
+2023-12-20 15:00:56,540 INFO    SystemMonitor:6048 [interfaces.py:start():190] Started disk monitoring
+2023-12-20 15:00:56,541 INFO    SystemMonitor:6048 [interfaces.py:start():190] Started gpu monitoring
+2023-12-20 15:00:56,553 INFO    SystemMonitor:6048 [interfaces.py:start():190] Started memory monitoring
+2023-12-20 15:00:56,568 INFO    SystemMonitor:6048 [interfaces.py:start():190] Started network monitoring
+2023-12-20 15:00:56,993 DEBUG   HandlerThread:6048 [handler.py:handle_request():146] handle_request: pause
+2023-12-20 15:00:56,993 INFO    HandlerThread:6048 [handler.py:handle_request_pause():705] stopping system metrics thread
+2023-12-20 15:00:56,993 INFO    HandlerThread:6048 [system_monitor.py:finish():203] Stopping system monitor
+2023-12-20 15:00:56,993 DEBUG   SystemMonitor:6048 [system_monitor.py:_start():172] Starting system metrics aggregation loop
+2023-12-20 15:00:57,002 INFO    HandlerThread:6048 [interfaces.py:finish():202] Joined cpu monitor
+2023-12-20 15:00:57,003 DEBUG   SystemMonitor:6048 [system_monitor.py:_start():179] Finished system metrics aggregation loop
+2023-12-20 15:00:57,003 INFO    HandlerThread:6048 [interfaces.py:finish():202] Joined disk monitor
+2023-12-20 15:00:57,003 DEBUG   SystemMonitor:6048 [system_monitor.py:_start():183] Publishing last batch of metrics
+2023-12-20 15:00:57,116 INFO    HandlerThread:6048 [interfaces.py:finish():202] Joined gpu monitor
+2023-12-20 15:00:57,116 INFO    HandlerThread:6048 [interfaces.py:finish():202] Joined memory monitor
+2023-12-20 15:00:57,117 INFO    HandlerThread:6048 [interfaces.py:finish():202] Joined network monitor
+2023-12-20 15:00:57,117 DEBUG   SenderThread:6048 [sender.py:send():382] send: stats
+2023-12-20 15:00:57,118 DEBUG   HandlerThread:6048 [handler.py:handle_request():146] handle_request: status_report
+2023-12-20 15:00:57,535 INFO    Thread-83 :6048 [dir_watcher.py:_on_file_created():271] file/dir created: c:\Users\devin\OneDrive - University of Rhode Island\URI\Junior\Junior Sem 1\CSC461\CSC461-FinalProj\CSC461_Final\wandb\run-20231220_150046-ak87xsw9\files\output.log
+2023-12-20 15:00:59,551 INFO    Thread-83 :6048 [dir_watcher.py:_on_file_modified():288] file/dir modified: c:\Users\devin\OneDrive - University of Rhode Island\URI\Junior\Junior Sem 1\CSC461\CSC461-FinalProj\CSC461_Final\wandb\run-20231220_150046-ak87xsw9\files\output.log
+2023-12-20 15:01:00,034 DEBUG   HandlerThread:6048 [handler.py:handle_request():146] handle_request: resume
+2023-12-20 15:01:00,034 INFO    HandlerThread:6048 [handler.py:handle_request_resume():696] starting system metrics thread
+2023-12-20 15:01:00,035 INFO    HandlerThread:6048 [system_monitor.py:start():194] Starting system monitor
+2023-12-20 15:01:00,035 INFO    SystemMonitor:6048 [system_monitor.py:_start():158] Starting system asset monitoring threads
+2023-12-20 15:01:00,047 INFO    SystemMonitor:6048 [interfaces.py:start():190] Started cpu monitoring
+2023-12-20 15:01:00,048 INFO    SystemMonitor:6048 [interfaces.py:start():190] Started disk monitoring
+2023-12-20 15:01:00,048 INFO    SystemMonitor:6048 [interfaces.py:start():190] Started gpu monitoring
+2023-12-20 15:01:00,063 INFO    SystemMonitor:6048 [interfaces.py:start():190] Started memory monitoring
+2023-12-20 15:01:00,081 INFO    SystemMonitor:6048 [interfaces.py:start():190] Started network monitoring
+2023-12-20 15:01:00,507 DEBUG   HandlerThread:6048 [handler.py:handle_request():146] handle_request: pause
+2023-12-20 15:01:00,508 INFO    HandlerThread:6048 [handler.py:handle_request_pause():705] stopping system metrics thread
+2023-12-20 15:01:00,508 INFO    HandlerThread:6048 [system_monitor.py:finish():203] Stopping system monitor
+2023-12-20 15:01:00,520 DEBUG   SystemMonitor:6048 [system_monitor.py:_start():172] Starting system metrics aggregation loop
+2023-12-20 15:01:00,520 DEBUG   SystemMonitor:6048 [system_monitor.py:_start():179] Finished system metrics aggregation loop
+2023-12-20 15:01:00,520 DEBUG   SystemMonitor:6048 [system_monitor.py:_start():183] Publishing last batch of metrics
+2023-12-20 15:01:00,520 INFO    HandlerThread:6048 [interfaces.py:finish():202] Joined cpu monitor
+2023-12-20 15:01:00,522 INFO    HandlerThread:6048 [interfaces.py:finish():202] Joined disk monitor
+2023-12-20 15:01:00,634 INFO    HandlerThread:6048 [interfaces.py:finish():202] Joined gpu monitor
+2023-12-20 15:01:00,634 INFO    HandlerThread:6048 [interfaces.py:finish():202] Joined memory monitor
+2023-12-20 15:01:00,634 INFO    HandlerThread:6048 [interfaces.py:finish():202] Joined network monitor
+2023-12-20 15:01:00,635 DEBUG   SenderThread:6048 [sender.py:send():382] send: stats
+2023-12-20 15:01:01,577 INFO    Thread-83 :6048 [dir_watcher.py:_on_file_modified():288] file/dir modified: c:\Users\devin\OneDrive - University of Rhode Island\URI\Junior\Junior Sem 1\CSC461\CSC461-FinalProj\CSC461_Final\wandb\run-20231220_150046-ak87xsw9\files\output.log
+2023-12-20 15:01:02,655 DEBUG   HandlerThread:6048 [handler.py:handle_request():146] handle_request: status_report
+2023-12-20 15:01:07,714 DEBUG   HandlerThread:6048 [handler.py:handle_request():146] handle_request: status_report
+2023-12-20 15:01:07,794 DEBUG   HandlerThread:6048 [handler.py:handle_request():146] handle_request: stop_status
+2023-12-20 15:01:07,795 DEBUG   HandlerThread:6048 [handler.py:handle_request():146] handle_request: internal_messages
+2023-12-20 15:01:07,795 DEBUG   SenderThread:6048 [sender.py:send_request():409] send_request: stop_status
+2023-12-20 15:01:08,034 DEBUG   HandlerThread:6048 [handler.py:handle_request():146] handle_request: resume
+2023-12-20 15:01:08,034 INFO    HandlerThread:6048 [handler.py:handle_request_resume():696] starting system metrics thread
+2023-12-20 15:01:08,034 INFO    HandlerThread:6048 [system_monitor.py:start():194] Starting system monitor
+2023-12-20 15:01:08,035 INFO    SystemMonitor:6048 [system_monitor.py:_start():158] Starting system asset monitoring threads
+2023-12-20 15:01:08,051 INFO    SystemMonitor:6048 [interfaces.py:start():190] Started cpu monitoring
+2023-12-20 15:01:08,053 INFO    SystemMonitor:6048 [interfaces.py:start():190] Started disk monitoring
+2023-12-20 15:01:08,054 INFO    SystemMonitor:6048 [interfaces.py:start():190] Started gpu monitoring
+2023-12-20 15:01:08,089 INFO    SystemMonitor:6048 [interfaces.py:start():190] Started memory monitoring
+2023-12-20 15:01:08,108 INFO    SystemMonitor:6048 [interfaces.py:start():190] Started network monitoring
+2023-12-20 15:01:08,324 DEBUG   SenderThread:6048 [sender.py:send():382] send: telemetry
+2023-12-20 15:01:08,328 DEBUG   SenderThread:6048 [sender.py:send():382] send: exit
+2023-12-20 15:01:08,328 INFO    SenderThread:6048 [sender.py:send_exit():589] handling exit code: 0
+2023-12-20 15:01:08,328 INFO    SenderThread:6048 [sender.py:send_exit():591] handling runtime: 1
+2023-12-20 15:01:08,331 INFO    SenderThread:6048 [sender.py:_save_file():1392] saving file wandb-summary.json with policy end
+2023-12-20 15:01:08,331 INFO    SenderThread:6048 [sender.py:send_exit():597] send defer
+2023-12-20 15:01:08,331 DEBUG   HandlerThread:6048 [handler.py:handle_request():146] handle_request: defer
+2023-12-20 15:01:08,332 INFO    HandlerThread:6048 [handler.py:handle_request_defer():172] handle defer: 0
+2023-12-20 15:01:08,332 DEBUG   SenderThread:6048 [sender.py:send_request():409] send_request: defer
+2023-12-20 15:01:08,332 INFO    SenderThread:6048 [sender.py:send_request_defer():613] handle sender defer: 0
+2023-12-20 15:01:08,332 INFO    SenderThread:6048 [sender.py:transition_state():617] send defer: 1
+2023-12-20 15:01:08,332 DEBUG   HandlerThread:6048 [handler.py:handle_request():146] handle_request: defer
+2023-12-20 15:01:08,333 INFO    HandlerThread:6048 [handler.py:handle_request_defer():172] handle defer: 1
+2023-12-20 15:01:08,333 DEBUG   SenderThread:6048 [sender.py:send_request():409] send_request: defer
+2023-12-20 15:01:08,333 INFO    SenderThread:6048 [sender.py:send_request_defer():613] handle sender defer: 1
+2023-12-20 15:01:08,333 INFO    SenderThread:6048 [sender.py:transition_state():617] send defer: 2
+2023-12-20 15:01:08,333 DEBUG   HandlerThread:6048 [handler.py:handle_request():146] handle_request: defer
+2023-12-20 15:01:08,333 INFO    HandlerThread:6048 [handler.py:handle_request_defer():172] handle defer: 2
+2023-12-20 15:01:08,333 INFO    HandlerThread:6048 [system_monitor.py:finish():203] Stopping system monitor
+2023-12-20 15:01:08,333 DEBUG   SystemMonitor:6048 [system_monitor.py:_start():172] Starting system metrics aggregation loop
+2023-12-20 15:01:08,346 DEBUG   SystemMonitor:6048 [system_monitor.py:_start():179] Finished system metrics aggregation loop
+2023-12-20 15:01:08,346 INFO    HandlerThread:6048 [interfaces.py:finish():202] Joined cpu monitor
+2023-12-20 15:01:08,346 DEBUG   SystemMonitor:6048 [system_monitor.py:_start():183] Publishing last batch of metrics
+2023-12-20 15:01:08,348 INFO    HandlerThread:6048 [interfaces.py:finish():202] Joined disk monitor
+2023-12-20 15:01:08,486 INFO    HandlerThread:6048 [interfaces.py:finish():202] Joined gpu monitor
+2023-12-20 15:01:08,486 INFO    HandlerThread:6048 [interfaces.py:finish():202] Joined memory monitor
+2023-12-20 15:01:08,486 INFO    HandlerThread:6048 [interfaces.py:finish():202] Joined network monitor
+2023-12-20 15:01:08,487 DEBUG   SenderThread:6048 [sender.py:send_request():409] send_request: defer
+2023-12-20 15:01:08,487 INFO    SenderThread:6048 [sender.py:send_request_defer():613] handle sender defer: 2
+2023-12-20 15:01:08,487 INFO    SenderThread:6048 [sender.py:transition_state():617] send defer: 3
+2023-12-20 15:01:08,487 DEBUG   SenderThread:6048 [sender.py:send():382] send: stats
+2023-12-20 15:01:08,487 DEBUG   HandlerThread:6048 [handler.py:handle_request():146] handle_request: defer
+2023-12-20 15:01:08,488 INFO    HandlerThread:6048 [handler.py:handle_request_defer():172] handle defer: 3
+2023-12-20 15:01:08,488 DEBUG   SenderThread:6048 [sender.py:send_request():409] send_request: defer
+2023-12-20 15:01:08,488 INFO    SenderThread:6048 [sender.py:send_request_defer():613] handle sender defer: 3
+2023-12-20 15:01:08,488 INFO    SenderThread:6048 [sender.py:transition_state():617] send defer: 4
+2023-12-20 15:01:08,488 DEBUG   HandlerThread:6048 [handler.py:handle_request():146] handle_request: defer
+2023-12-20 15:01:08,488 INFO    HandlerThread:6048 [handler.py:handle_request_defer():172] handle defer: 4
+2023-12-20 15:01:08,489 DEBUG   SenderThread:6048 [sender.py:send_request():409] send_request: defer
+2023-12-20 15:01:08,489 INFO    SenderThread:6048 [sender.py:send_request_defer():613] handle sender defer: 4
+2023-12-20 15:01:08,489 INFO    SenderThread:6048 [sender.py:transition_state():617] send defer: 5
+2023-12-20 15:01:08,489 DEBUG   HandlerThread:6048 [handler.py:handle_request():146] handle_request: defer
+2023-12-20 15:01:08,489 INFO    HandlerThread:6048 [handler.py:handle_request_defer():172] handle defer: 5
+2023-12-20 15:01:08,489 DEBUG   SenderThread:6048 [sender.py:send():382] send: summary
+2023-12-20 15:01:08,490 INFO    SenderThread:6048 [sender.py:_save_file():1392] saving file wandb-summary.json with policy end
+2023-12-20 15:01:08,491 DEBUG   SenderThread:6048 [sender.py:send_request():409] send_request: defer
+2023-12-20 15:01:08,492 INFO    SenderThread:6048 [sender.py:send_request_defer():613] handle sender defer: 5
+2023-12-20 15:01:08,492 INFO    SenderThread:6048 [sender.py:transition_state():617] send defer: 6
+2023-12-20 15:01:08,492 DEBUG   HandlerThread:6048 [handler.py:handle_request():146] handle_request: defer
+2023-12-20 15:01:08,492 INFO    HandlerThread:6048 [handler.py:handle_request_defer():172] handle defer: 6
+2023-12-20 15:01:08,492 DEBUG   SenderThread:6048 [sender.py:send_request():409] send_request: defer
+2023-12-20 15:01:08,492 INFO    SenderThread:6048 [sender.py:send_request_defer():613] handle sender defer: 6
+2023-12-20 15:01:08,496 DEBUG   HandlerThread:6048 [handler.py:handle_request():146] handle_request: status_report
+2023-12-20 15:01:08,600 INFO    SenderThread:6048 [sender.py:transition_state():617] send defer: 7
+2023-12-20 15:01:08,600 DEBUG   HandlerThread:6048 [handler.py:handle_request():146] handle_request: defer
+2023-12-20 15:01:08,600 INFO    HandlerThread:6048 [handler.py:handle_request_defer():172] handle defer: 7
+2023-12-20 15:01:08,601 DEBUG   SenderThread:6048 [sender.py:send_request():409] send_request: defer
+2023-12-20 15:01:08,601 INFO    SenderThread:6048 [sender.py:send_request_defer():613] handle sender defer: 7
+2023-12-20 15:01:08,638 INFO    Thread-83 :6048 [dir_watcher.py:_on_file_modified():288] file/dir modified: c:\Users\devin\OneDrive - University of Rhode Island\URI\Junior\Junior Sem 1\CSC461\CSC461-FinalProj\CSC461_Final\wandb\run-20231220_150046-ak87xsw9\files\config.yaml
+2023-12-20 15:01:08,639 INFO    Thread-83 :6048 [dir_watcher.py:_on_file_created():271] file/dir created: c:\Users\devin\OneDrive - University of Rhode Island\URI\Junior\Junior Sem 1\CSC461\CSC461-FinalProj\CSC461_Final\wandb\run-20231220_150046-ak87xsw9\files\wandb-summary.json
+2023-12-20 15:01:09,337 DEBUG   HandlerThread:6048 [handler.py:handle_request():146] handle_request: poll_exit
+2023-12-20 15:01:10,306 INFO    SenderThread:6048 [sender.py:transition_state():617] send defer: 8
+2023-12-20 15:01:10,306 DEBUG   SenderThread:6048 [sender.py:send_request():409] send_request: poll_exit
+2023-12-20 15:01:10,306 DEBUG   HandlerThread:6048 [handler.py:handle_request():146] handle_request: defer
+2023-12-20 15:01:10,307 INFO    HandlerThread:6048 [handler.py:handle_request_defer():172] handle defer: 8
+2023-12-20 15:01:10,307 DEBUG   SenderThread:6048 [sender.py:send_request():409] send_request: defer
+2023-12-20 15:01:10,307 INFO    SenderThread:6048 [sender.py:send_request_defer():613] handle sender defer: 8
+2023-12-20 15:01:10,307 INFO    SenderThread:6048 [job_builder.py:build():298] Attempting to build job artifact
+2023-12-20 15:01:10,308 INFO    SenderThread:6048 [job_builder.py:_get_source_type():428] is repo sourced job
+2023-12-20 15:01:10,308 INFO    SenderThread:6048 [job_builder.py:_get_program_relpath():446] run is notebook based run
+2023-12-20 15:01:10,308 INFO    SenderThread:6048 [sender.py:transition_state():617] send defer: 9
+2023-12-20 15:01:10,308 DEBUG   HandlerThread:6048 [handler.py:handle_request():146] handle_request: defer
+2023-12-20 15:01:10,308 INFO    HandlerThread:6048 [handler.py:handle_request_defer():172] handle defer: 9
+2023-12-20 15:01:10,308 DEBUG   SenderThread:6048 [sender.py:send_request():409] send_request: defer
+2023-12-20 15:01:10,308 INFO    SenderThread:6048 [sender.py:send_request_defer():613] handle sender defer: 9
+2023-12-20 15:01:10,309 INFO    SenderThread:6048 [dir_watcher.py:finish():358] shutting down directory watcher
+2023-12-20 15:01:10,352 DEBUG   HandlerThread:6048 [handler.py:handle_request():146] handle_request: poll_exit
+2023-12-20 15:01:10,665 INFO    SenderThread:6048 [dir_watcher.py:_on_file_modified():288] file/dir modified: c:\Users\devin\OneDrive - University of Rhode Island\URI\Junior\Junior Sem 1\CSC461\CSC461-FinalProj\CSC461_Final\wandb\run-20231220_150046-ak87xsw9\files\output.log
+2023-12-20 15:01:10,666 INFO    SenderThread:6048 [dir_watcher.py:finish():388] scan: c:\Users\devin\OneDrive - University of Rhode Island\URI\Junior\Junior Sem 1\CSC461\CSC461-FinalProj\CSC461_Final\wandb\run-20231220_150046-ak87xsw9\files
+2023-12-20 15:01:10,668 INFO    SenderThread:6048 [dir_watcher.py:finish():402] scan save: c:\Users\devin\OneDrive - University of Rhode Island\URI\Junior\Junior Sem 1\CSC461\CSC461-FinalProj\CSC461_Final\wandb\run-20231220_150046-ak87xsw9\files\config.yaml config.yaml
+2023-12-20 15:01:10,668 INFO    SenderThread:6048 [dir_watcher.py:finish():402] scan save: c:\Users\devin\OneDrive - University of Rhode Island\URI\Junior\Junior Sem 1\CSC461\CSC461-FinalProj\CSC461_Final\wandb\run-20231220_150046-ak87xsw9\files\output.log output.log
+2023-12-20 15:01:10,669 INFO    SenderThread:6048 [dir_watcher.py:finish():402] scan save: c:\Users\devin\OneDrive - University of Rhode Island\URI\Junior\Junior Sem 1\CSC461\CSC461-FinalProj\CSC461_Final\wandb\run-20231220_150046-ak87xsw9\files\requirements.txt requirements.txt
+2023-12-20 15:01:10,675 INFO    SenderThread:6048 [dir_watcher.py:finish():402] scan save: c:\Users\devin\OneDrive - University of Rhode Island\URI\Junior\Junior Sem 1\CSC461\CSC461-FinalProj\CSC461_Final\wandb\run-20231220_150046-ak87xsw9\files\wandb-metadata.json wandb-metadata.json
+2023-12-20 15:01:10,677 INFO    SenderThread:6048 [dir_watcher.py:finish():402] scan save: c:\Users\devin\OneDrive - University of Rhode Island\URI\Junior\Junior Sem 1\CSC461\CSC461-FinalProj\CSC461_Final\wandb\run-20231220_150046-ak87xsw9\files\wandb-summary.json wandb-summary.json
+2023-12-20 15:01:10,679 INFO    SenderThread:6048 [sender.py:transition_state():617] send defer: 10
+2023-12-20 15:01:10,680 DEBUG   SenderThread:6048 [sender.py:send_request():409] send_request: poll_exit
+2023-12-20 15:01:10,680 DEBUG   HandlerThread:6048 [handler.py:handle_request():146] handle_request: defer
+2023-12-20 15:01:10,680 INFO    HandlerThread:6048 [handler.py:handle_request_defer():172] handle defer: 10
+2023-12-20 15:01:10,681 DEBUG   SenderThread:6048 [sender.py:send_request():409] send_request: defer
+2023-12-20 15:01:10,686 INFO    SenderThread:6048 [sender.py:send_request_defer():613] handle sender defer: 10
+2023-12-20 15:01:10,686 INFO    SenderThread:6048 [file_pusher.py:finish():175] shutting down file pusher
+2023-12-20 15:01:10,888 INFO    wandb-upload_1:6048 [upload_job.py:push():131] Uploaded file c:\Users\devin\OneDrive - University of Rhode Island\URI\Junior\Junior Sem 1\CSC461\CSC461-FinalProj\CSC461_Final\wandb\run-20231220_150046-ak87xsw9\files\output.log
+2023-12-20 15:01:10,921 INFO    wandb-upload_0:6048 [upload_job.py:push():131] Uploaded file c:\Users\devin\OneDrive - University of Rhode Island\URI\Junior\Junior Sem 1\CSC461\CSC461-FinalProj\CSC461_Final\wandb\run-20231220_150046-ak87xsw9\files\config.yaml
+2023-12-20 15:01:10,970 INFO    wandb-upload_2:6048 [upload_job.py:push():131] Uploaded file c:\Users\devin\OneDrive - University of Rhode Island\URI\Junior\Junior Sem 1\CSC461\CSC461-FinalProj\CSC461_Final\wandb\run-20231220_150046-ak87xsw9\files\requirements.txt
+2023-12-20 15:01:11,013 INFO    wandb-upload_3:6048 [upload_job.py:push():131] Uploaded file c:\Users\devin\OneDrive - University of Rhode Island\URI\Junior\Junior Sem 1\CSC461\CSC461-FinalProj\CSC461_Final\wandb\run-20231220_150046-ak87xsw9\files\wandb-summary.json
+2023-12-20 15:01:11,225 INFO    Thread-82 (_thread_body):6048 [sender.py:transition_state():617] send defer: 11
+2023-12-20 15:01:11,225 DEBUG   HandlerThread:6048 [handler.py:handle_request():146] handle_request: defer
+2023-12-20 15:01:11,226 INFO    HandlerThread:6048 [handler.py:handle_request_defer():172] handle defer: 11
+2023-12-20 15:01:11,226 DEBUG   SenderThread:6048 [sender.py:send_request():409] send_request: defer
+2023-12-20 15:01:11,226 INFO    SenderThread:6048 [sender.py:send_request_defer():613] handle sender defer: 11
+2023-12-20 15:01:11,226 INFO    SenderThread:6048 [file_pusher.py:join():181] waiting for file pusher
+2023-12-20 15:01:11,226 INFO    SenderThread:6048 [sender.py:transition_state():617] send defer: 12
+2023-12-20 15:01:11,226 DEBUG   HandlerThread:6048 [handler.py:handle_request():146] handle_request: defer
+2023-12-20 15:01:11,226 INFO    HandlerThread:6048 [handler.py:handle_request_defer():172] handle defer: 12
+2023-12-20 15:01:11,226 DEBUG   SenderThread:6048 [sender.py:send_request():409] send_request: defer
+2023-12-20 15:01:11,227 INFO    SenderThread:6048 [sender.py:send_request_defer():613] handle sender defer: 12
+2023-12-20 15:01:11,227 INFO    SenderThread:6048 [file_stream.py:finish():595] file stream finish called
+2023-12-20 15:01:11,300 INFO    SenderThread:6048 [file_stream.py:finish():599] file stream finish is done
+2023-12-20 15:01:11,300 INFO    SenderThread:6048 [sender.py:transition_state():617] send defer: 13
+2023-12-20 15:01:11,300 DEBUG   HandlerThread:6048 [handler.py:handle_request():146] handle_request: defer
+2023-12-20 15:01:11,300 INFO    HandlerThread:6048 [handler.py:handle_request_defer():172] handle defer: 13
+2023-12-20 15:01:11,301 DEBUG   SenderThread:6048 [sender.py:send_request():409] send_request: defer
+2023-12-20 15:01:11,301 INFO    SenderThread:6048 [sender.py:send_request_defer():613] handle sender defer: 13
+2023-12-20 15:01:11,301 INFO    SenderThread:6048 [sender.py:transition_state():617] send defer: 14
+2023-12-20 15:01:11,301 DEBUG   HandlerThread:6048 [handler.py:handle_request():146] handle_request: defer
+2023-12-20 15:01:11,301 INFO    HandlerThread:6048 [handler.py:handle_request_defer():172] handle defer: 14
+2023-12-20 15:01:11,301 DEBUG   SenderThread:6048 [sender.py:send():382] send: final
+2023-12-20 15:01:11,302 DEBUG   SenderThread:6048 [sender.py:send():382] send: footer
+2023-12-20 15:01:11,302 DEBUG   SenderThread:6048 [sender.py:send_request():409] send_request: defer
+2023-12-20 15:01:11,302 INFO    SenderThread:6048 [sender.py:send_request_defer():613] handle sender defer: 14
+2023-12-20 15:01:11,303 DEBUG   HandlerThread:6048 [handler.py:handle_request():146] handle_request: poll_exit
+2023-12-20 15:01:11,303 DEBUG   SenderThread:6048 [sender.py:send_request():409] send_request: poll_exit
+2023-12-20 15:01:11,303 DEBUG   HandlerThread:6048 [handler.py:handle_request():146] handle_request: internal_messages
+2023-12-20 15:01:11,303 DEBUG   HandlerThread:6048 [handler.py:handle_request():146] handle_request: server_info
+2023-12-20 15:01:11,303 DEBUG   HandlerThread:6048 [handler.py:handle_request():146] handle_request: get_summary
+2023-12-20 15:01:11,305 DEBUG   HandlerThread:6048 [handler.py:handle_request():146] handle_request: sampled_history
+2023-12-20 15:01:11,305 DEBUG   SenderThread:6048 [sender.py:send_request():409] send_request: server_info
+2023-12-20 15:01:11,305 DEBUG   HandlerThread:6048 [handler.py:handle_request():146] handle_request: job_info
+2023-12-20 15:01:11,357 DEBUG   SenderThread:6048 [sender.py:send_request():409] send_request: job_info
+2023-12-20 15:01:11,358 DEBUG   HandlerThread:6048 [handler.py:handle_request():146] handle_request: shutdown
+2023-12-20 15:01:11,358 INFO    HandlerThread:6048 [handler.py:finish():866] shutting down handler
+2023-12-20 15:01:12,306 INFO    WriterThread:6048 [datastore.py:close():294] close: c:\Users\devin\OneDrive - University of Rhode Island\URI\Junior\Junior Sem 1\CSC461\CSC461-FinalProj\CSC461_Final\wandb\run-20231220_150046-ak87xsw9\run-ak87xsw9.wandb
+2023-12-20 15:01:12,367 INFO    SenderThread:6048 [sender.py:finish():1548] shutting down sender
+2023-12-20 15:01:12,367 INFO    SenderThread:6048 [file_pusher.py:finish():175] shutting down file pusher
+2023-12-20 15:01:12,367 INFO    SenderThread:6048 [file_pusher.py:join():181] waiting for file pusher
