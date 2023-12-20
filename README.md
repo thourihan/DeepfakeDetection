@@ -34,11 +34,11 @@ Here are some examples of the model's output, along with its heatmap visualizati
     EfficientNet: real (97.83% confidence)<br>
     FasterViT: real (98.55% confidence)
   </p>
-  <img src="images/donald-trump-real.jpg" alt="Donald Trump Real" width="224" height="224"/>
+  <img src="images/donald-trump-real.jpg" alt="Donald Trump Real" width="301" height="224"/>
 </div>
 <div>
   <p><strong>Heatmap Visualization</strong></p>
-  <img src="images/donald-trump-real-heatmap.png" alt="Heatmap of Donald Trump Real" width="301" height="224"/>
+  <img src="images/donald-trump-real-heatmap.png" alt="Heatmap of Donald Trump Real" width="224" height="224"/>
 </div>
 
 ## Installation
