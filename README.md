@@ -9,37 +9,50 @@ In this project, we used EfficientNet and FasterViT to detect deepfake images fr
 - **Heatmap Visualization:** Generates heatmaps for each image to show what the model is "looking at" using Grad-CAM.
 
 ## Sample Predictions and Heatmap Visualizations 
-Here are some examples of the model's output, along with its heatmap visualizations.
+Here are a couple of examples of the model's output, along with heatmap visualizations for each.
 
 ### Deepfake Detection Example
-<div>
-  <p>
-    <strong>Mark Zuckerberg Deepfake</strong><br>
-    Predictions:<br>
-    EfficientNet: fake (62.11% confidence)<br>
-    FasterViT: fake (97.33% confidence)
-  </p>
-  <img src="images/mark-zuckerberg-deepfake.webp" alt="Mark Zuckerberg Deepfake" width="361" height="224"/>
-</div>
-<div>
-  <p><strong>Heatmap Visualization</strong></p>
-  <img src="images/mark-zuckerberg-deepfake-heatmap.png" alt="Heatmap of Mark Zuckerberg Deepfake" width="224" height="224"/>
-</div>
+## Sample Predictions and Heatmap Visualizations 
+Here are a couple of examples of the model's output, along with heatmap visualizations for each.
+
+### Deepfake Detection Example
+**Mark Zuckerberg Deepfake**  
+Predictions:  
+EfficientNet: fake (62.11% confidence)  
+FasterViT: fake (97.33% confidence)
+
+<table>
+  <tr>
+    <td>
+      <p><strong>Input Image</strong></p>
+      <img src="images/mark-zuckerberg-deepfake.webp" alt="Mark Zuckerberg Deepfake" width="361" height="224"/>
+    </td>
+    <td>
+      <p><strong>Heatmap Visualization</strong></p>
+      <img src="images/mark-zuckerberg-deepfake-heatmap.png" alt="Heatmap of Mark Zuckerberg Deepfake" width="224" height="224"/>
+    </td>
+  </tr>
+</table>
 
 ### Real Image Detection Example
-<div>
-  <p>
-    <strong>Donald Trump Real</strong><br>
-    Predictions:<br>
-    EfficientNet: real (97.83% confidence)<br>
-    FasterViT: real (98.55% confidence)
-  </p>
-  <img src="images/donald-trump-real.jpg" alt="Donald Trump Real" width="301" height="224"/>
-</div>
-<div>
-  <p><strong>Heatmap Visualization</strong></p>
-  <img src="images/donald-trump-real-heatmap.png" alt="Heatmap of Donald Trump Real" width="224" height="224"/>
-</div>
+**Donald Trump Real**  
+Predictions:  
+EfficientNet: real (97.83% confidence)  
+FasterViT: real (98.55% confidence)
+
+<table>
+  <tr>
+    <td>
+      <p><strong>Input Image</strong></p>
+      <img src="images/donald-trump-real.jpg" alt="Donald Trump Real" width="301" height="224"/>
+    </td>
+    <td>
+      <p><strong>Heatmap Visualization</strong></p>
+      <img src="images/donald-trump-real-heatmap.png" alt="Heatmap of Donald Trump Real" width="224" height="224"/>
+    </td>
+  </tr>
+</table>
+
 
 ## Installation
 To set up the project, follow these steps:
