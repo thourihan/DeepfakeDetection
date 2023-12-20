@@ -12,16 +12,34 @@ In this project, we used EfficientNet and FasterViT to detect deepfake images fr
 Here are some examples of the model's output, along with its heatmap visualizations.
 
 ### Deepfake Detection Example
-- **Mark Zuckerberg (Deepfake Image)**
+<div>
+  <p>
+    <strong>Mark Zuckerberg Deepfake</strong><br>
+    Predictions:<br>
+    EfficientNet: fake (62.11% confidence)<br>
+    FasterViT: fake (97.33% confidence)
+  </p>
   <img src="images/mark-zuckerberg-deepfake.webp" alt="Mark Zuckerberg Deepfake" width="224" height="224"/>
-- **Heatmap Visualization**
+</div>
+<div>
+  <p><strong>Heatmap Visualization</strong></p>
   <img src="images/mark-zuckerberg-deepfake-heatmap.png" alt="Heatmap of Mark Zuckerberg Deepfake" width="224" height="224"/>
+</div>
 
 ### Real Image Detection Example
-- **Donald Trump (Real Image)**
+<div>
+  <p>
+    <strong>Donald Trump Real</strong><br>
+    Predictions:<br>
+    EfficientNet: real (97.83% confidence)<br>
+    FasterViT: real (98.55% confidence)
+  </p>
   <img src="images/donald-trump-real.jpg" alt="Donald Trump Real" width="224" height="224"/>
-- **Heatmap Visualization**
+</div>
+<div>
+  <p><strong>Heatmap Visualization</strong></p>
   <img src="images/donald-trump-real-heatmap.png" alt="Heatmap of Donald Trump Real" width="224" height="224"/>
+</div>
 
 ## Installation
 To set up the project, follow these steps:
