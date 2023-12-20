@@ -4,20 +4,32 @@ import torch.nn.functional as F
 from torchvision import transforms
 from PIL import Image
 from efficientnet_pytorch import EfficientNet
+from fastervit.models.faster_vit import FasterViT
+from fastervit import create_model
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
 from gradcam.utils import visualize_cam
 from gradcam import GradCAM, GradCAMpp
 import gradio as gr
+import os
 
-# Initialize model architecture with EfficientNet B3
-model = EfficientNet.from_pretrained('efficientnet-b3')
+# Initialize EfficientNet model
+efficientnet_model = EfficientNet.from_pretrained('efficientnet-b3')
 num_classes = 2
-in_features = model._fc.in_features
-model._fc = nn.Linear(in_features, num_classes)
-model.load_state_dict(torch.load("model_after_test.pth", map_location=torch.device('cpu')))
-model.eval()
+in_features = efficientnet_model._fc.in_features
+efficientnet_model._fc = nn.Linear(in_features, num_classes)
+efficientnet_model.load_state_dict(torch.load("EfficientNetModel.pth", map_location=torch.device('cpu')))
+efficientnet_model.eval()
+
+# Initialize FasterViT model
+model_name = 'faster_vit_0_224' 
+faster_vit_model = create_model(model_name, pretrained=False, model_path=None)
+num_classes = 2
+in_features = faster_vit_model.head.in_features
+faster_vit_model.head = nn.Linear(in_features, num_classes)
+faster_vit_model.load_state_dict(torch.load("FasterVitModel.pth", map_location=torch.device('cpu')))
+faster_vit_model.eval()
 
 # Preparing image
 def process_image(image):
@@ -30,22 +42,33 @@ def process_image(image):
     return preprocess(image).unsqueeze(0)
 
 # Function to predict and generate heatmap
-def predict_and_visualize(image):
+def predict_and_visualize(image):   
     img_tensor = process_image(image)
-
-    # Make prediction
-    logits = model(img_tensor)
-    probabilities = F.softmax(logits, dim=1)
-    predicted_class = torch.argmax(probabilities, dim=1).item()
-    confidence = probabilities[0][predicted_class].item() * 100  # Convert to percentage
-
-    # Map the numeric prediction to a label
     class_labels = {0: "fake", 1: "real"}
-    predicted_label = class_labels[predicted_class]
 
-    # Grad-CAM
-    target_layer = model._conv_head
-    grad_cam = GradCAM(model, target_layer)
+    # EfficientNet Prediction
+    logits_efficientnet = efficientnet_model(img_tensor)
+    probabilities_efficientnet = F.softmax(logits_efficientnet, dim=1)
+    predicted_class_efficientnet = torch.argmax(probabilities_efficientnet, dim=1).item()
+    confidence_efficientnet = probabilities_efficientnet[0][predicted_class_efficientnet].item() * 100
+    predicted_label_efficientnet = class_labels[predicted_class_efficientnet]
+
+    # FasterViT Prediction
+    logits_fastervit = faster_vit_model(img_tensor)
+    probabilities_fastervit = F.softmax(logits_fastervit, dim=1)
+    predicted_class_fastervit = torch.argmax(probabilities_fastervit, dim=1).item()
+    confidence_fastervit = probabilities_fastervit[0][predicted_class_fastervit].item() * 100
+
+
+    if predicted_class_fastervit in class_labels:
+        predicted_label_fastervit = class_labels[predicted_class_fastervit]
+    else:
+        predicted_label_fastervit = f"Unknown Class: {predicted_class_fastervit}"
+
+
+    # Grad-CAM for EfficientNet
+    target_layer = efficientnet_model._conv_head
+    grad_cam = GradCAM(efficientnet_model, target_layer)
     mask, _ = grad_cam(img_tensor)
     heatmap, result = visualize_cam(mask, img_tensor)
 
@@ -53,7 +76,11 @@ def predict_and_visualize(image):
     result_image = np.transpose(result.numpy(), (1, 2, 0))
     result_image = np.clip(result_image, 0, 1)
 
-    return result_image, f"{predicted_label} ({confidence:.2f}% confidence)"
+    # Combine results
+    combined_result = f"EfficientNet: {predicted_label_efficientnet} ({confidence_efficientnet:.2f}% confidence)\n" \
+                      f"FasterViT: {predicted_label_fastervit} ({confidence_fastervit:.2f}% confidence)"
+
+    return result_image, combined_result
 
 # Gradio interface
 iface = gr.Interface(
