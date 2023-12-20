@@ -19,7 +19,7 @@ Here are some examples of the model's output, along with its heatmap visualizati
     EfficientNet: fake (62.11% confidence)<br>
     FasterViT: fake (97.33% confidence)
   </p>
-  <img src="images/mark-zuckerberg-deepfake.webp" alt="Mark Zuckerberg Deepfake" width="224" height="224"/>
+  <img src="images/mark-zuckerberg-deepfake.webp" alt="Mark Zuckerberg Deepfake" width="361" height="224"/>
 </div>
 <div>
   <p><strong>Heatmap Visualization</strong></p>
@@ -38,7 +38,7 @@ Here are some examples of the model's output, along with its heatmap visualizati
 </div>
 <div>
   <p><strong>Heatmap Visualization</strong></p>
-  <img src="images/donald-trump-real-heatmap.png" alt="Heatmap of Donald Trump Real" width="224" height="224"/>
+  <img src="images/donald-trump-real-heatmap.png" alt="Heatmap of Donald Trump Real" width="301" height="224"/>
 </div>
 
 ## Installation
