@@ -23,7 +23,7 @@ efficientnet_model.load_state_dict(torch.load("EfficientNetModel.pth", map_locat
 efficientnet_model.eval()
 
 # Initialize FasterViT model
-model_name = 'faster_vit_0_224' 
+model_name = 'faster_vit_2_224' 
 faster_vit_model = create_model(model_name, pretrained=False, model_path=None)
 num_classes = 2
 in_features = faster_vit_model.head.in_features
