@@ -12,10 +12,6 @@ In this project, we used EfficientNet and FasterViT to detect deepfake images fr
 Here are a couple of examples of the model's output, along with heatmap visualizations for each.
 
 ### Deepfake Detection Example
-## Sample Predictions and Heatmap Visualizations 
-Here are a couple of examples of the model's output, along with heatmap visualizations for each.
-
-### Deepfake Detection Example
 **Mark Zuckerberg Deepfake**  
 Predictions:  
 EfficientNet: fake (62.11% confidence)  
