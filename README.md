@@ -1,4 +1,4 @@
-# CSC 461 Final: Deepfake Image Detection with EfficientNet and FasterViT
+# Deepfake Image Detection with EfficientNet and FasterViT
 
 ## Project Overview
 In this project, we used EfficientNet and FasterViT to detect deepfake images from real ones. Deepfakes pose significant challenges in the realms of security, privacy, and information integrity. Our goal was to develop a robust model capable of accurately distinguishing between real and deep fake images by using the latest advancements in machine learning and image processing.
