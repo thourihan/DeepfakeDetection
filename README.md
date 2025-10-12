@@ -61,9 +61,32 @@ Make sure you have Python installed on your system, we used Python 3.11.6. Insta
 We have provided pre-trained model files for your convenience. You can download our EfficientNetModel.pth and FasterVitModel.pth files from the following Google Drive links:
     - EfficientNetModel.pth: [Download Here](https://drive.google.com/file/d/1xVW50FY02utzv_ux-474tNXU8d7giKkD/view?usp=sharing)
     - FasterVitModel.pth: [Download Here](https://drive.google.com/file/d/120Lz6ueJEPzhTHkxA58kmwtU6IY6O6NX/view?usp=sharing)
-    - Note: If you prefer to train the models yourself, you can use the train_model.ipynb (for EfficientNet) and train_model_fastervit.ipynb (for FasterViT).
+
+  - Note: If you prefer to train the models yourself, use the modular notebooks:
+    - `models/efficientcnn/train.ipynb` (EfficientNet)
+    - `models/fastervit/train.ipynb` (FasterViT)
+
 4. Run the Application:
-To start the Gradio web interface, run `python run_model.py`
+To start the Gradio web interface, run `python main.py`
+
+
+## Project Structure
+
+```
+DeepfakeDetection/
+├── main.py                # Entrypoint for running the system (Gradio app, etc.)
+├── requirements.txt
+├── README.md
+├── images/                # Example images and heatmaps
+├── models/
+│   ├── efficientcnn/
+│   │   ├── train.ipynb    # EfficientNet training notebook
+│   │   └── config.yaml    # (Optional) Model-specific config
+│   └── fastervit/
+│       ├── train.ipynb    # FasterViT training notebook
+│       └── config.yaml    # (Optional) Model-specific config
+└── Dataset/               # Place your training/validation/test data here
+```
 
 ## Usage
 After launching the application, navigate to the Gradio web URL displayed in your terminal.
