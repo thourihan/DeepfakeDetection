@@ -5,8 +5,6 @@ In this project, we used EfficientNet and FasterViT to detect deepfake images fr
 
 Checkout the research paper [here](https://docs.google.com/document/d/1Duh0sKFxBPB-_-t1U8HRtR3py7OVKb715McTbgyHh7Q/edit?usp=sharing)!
 
-You can also find some runs on WandB, we are hoping to implement a more excessive hyperparameter sweep feature in the future: https://wandb.ai/461
-
 ## Features
 - **EfficientNet and FasterViT Models:** Utilizes pre-trained EfficientNet and FasterViT models to classify images as "real" or "fake".
 - **Gradio Interface:** Provides an easy-to-use web interface for uploading images and viewing predictions.
@@ -75,4 +73,3 @@ After launching the application, navigate to the Gradio web URL displayed in you
 
 ## Dataset
 The models are trained on a dataset available on Kaggle: [Deepfake and Real Images](https://www.kaggle.com/datasets/manjilkarki/deepfake-and-real-images). Make sure you download and place the dataset in the appropriate directory before running the training notebooks.
-
