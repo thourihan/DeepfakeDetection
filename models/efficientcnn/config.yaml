@@ -1,0 +1,13 @@
+# EfficientCNN training configuration
+batch_size: 32
+epochs: 1
+learning_rate: 0.001
+weight_decay: 1e-5
+image_size: 256
+num_workers: 8
+model_name: efficientnet-b3
+dropout_rate: 0.5
+dataset:
+  train: Dataset/train
+  val: Dataset/validation
+  test: Dataset/test
