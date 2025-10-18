@@ -1,16 +1,17 @@
-# Deepfake Image Detection with EfficientNet and FasterViT
+# Deepfake Image Detection with EfficientNet, FasterViT, and EfficientFormerV2
 
 ## Project Overview
-In this project, we used EfficientNet and FasterViT to detect deepfake images from real ones. Deepfakes pose significant challenges in the realms of security, privacy, and information integrity. Our goal was to develop a robust model capable of accurately distinguishing between real and deep fake images by using the latest advancements in machine learning and image processing.
+This project detects deepfake images using modern CNN/ViT-family backbones. We use EfficientNet, FasterViT, and EfficientFormerV2-S1 to balance speed and accuracy, and to diversify architectures to reduce brittleness to dataset-specific artifacts. Models are integrated via `timm`, with reproducible training/evaluation and Grad-CAM visualizations.
 
-Checkout the research paper [here](https://docs.google.com/document/d/1Duh0sKFxBPB-_-t1U8HRtR3py7OVKb715McTbgyHh7Q/edit?usp=sharing)!
+Check out the research paper [here](https://docs.google.com/document/d/1Duh0sKFxBPB-_-t1U8HRtR3py7OVKb715McTbgyHh7Q/edit?usp=sharing)!
 
 ## Features
-- **EfficientNet and FasterViT Models:** Utilizes pre-trained EfficientNet and FasterViT models to classify images as "real" or "fake".
-- **Gradio Interface:** Provides an easy-to-use web interface for uploading images and viewing predictions.
-- **Heatmap Visualization:** Generates heatmaps for each image to show what the model is "looking at" using Grad-CAM.
+- **Multiple Backbones (via timm):** EfficientNet, FasterViT, and EfficientFormerV2-S1 for complementary accuracy/latency trade-offs.
+- **Gradio Interface:** Simple web UI for uploading images and viewing model predictions.
+- **Grad-CAM Visualization:** Heatmaps highlighting the regions driving model decisions (available across models).
+- **Training & Evaluation Scripts:** Ssripts for training and evaluation with Grad-CAM oututs. 
 
-## Sample Predictions and Heatmap Visualizations 
+## Sample Predictions and Heatmap Visualizations
 Here are a couple of examples of the model's output, along with heatmap visualizations for each.
 
 ### Deepfake Detection Example
@@ -51,48 +52,10 @@ FasterViT: real (98.55% confidence)
   </tr>
 </table>
 
-
 ## Installation
 To set up the project, follow these steps:
-1. Clone the Repository
-2. Install dependencies:
-Make sure you have Python installed on your system, we used Python 3.11.6. Install the required packages using `pip install -r requirements.txt`
-3. Train the models:
-We have provided pre-trained model files for your convenience. You can download our EfficientNetModel.pth and FasterVitModel.pth files from the following Google Drive links:
-    - EfficientNetModel.pth: [Download Here](https://drive.google.com/file/d/1xVW50FY02utzv_ux-474tNXU8d7giKkD/view?usp=sharing)
-    - FasterVitModel.pth: [Download Here](https://drive.google.com/file/d/120Lz6ueJEPzhTHkxA58kmwtU6IY6O6NX/view?usp=sharing)
-
-  - Note: If you prefer to train the models yourself, use the modular notebooks:
-    - `models/efficientcnn/train.ipynb` (EfficientNet)
-    - `models/fastervit/train.ipynb` (FasterViT)
-
-4. Run the Application:
-To start the Gradio web interface, run `python main.py`
-
-
-## Project Structure
-
-```
-DeepfakeDetection/
-├── main.py                # Entrypoint for running the system (Gradio app, etc.)
-├── requirements.txt
-├── README.md
-├── images/                # Example images and heatmaps
-├── models/
-│   ├── efficientcnn/
-│   │   ├── train.ipynb    # EfficientNet training notebook
-│   │   └── config.yaml    # (Optional) Model-specific config
-│   └── fastervit/
-│       ├── train.ipynb    # FasterViT training notebook
-│       └── config.yaml    # (Optional) Model-specific config
-└── Dataset/               # Place your training/validation/test data here
-```
-
-## Usage
-After launching the application, navigate to the Gradio web URL displayed in your terminal.
-1. **Upload an Image:** Click the upload button and select an image with a face.
-2. **View Predictions:** The model will process the image and display whether the face is real or fake, along with confidence scores.
-3. **Heatmap Visualization:** Alongside the predictions, a heatmap overlay on the image will be displayed, showing the areas most influential in the model's decision.
-
-## Dataset
-The models are trained on a dataset available on Kaggle: [Deepfake and Real Images](https://www.kaggle.com/datasets/manjilkarki/deepfake-and-real-images). Make sure you download and place the dataset in the appropriate directory before running the training notebooks.
+1. **Clone the repository.**
+2. **Install dependencies:** We use Python 3.11+ (tested on 3.11/3.12).  
+   Install with:
+   ```bash
+   pip install -r requirements.txt
