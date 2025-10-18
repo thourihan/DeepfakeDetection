@@ -9,7 +9,7 @@ import timm
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 from efficientnet_pytorch import EfficientNet
 from fastervit import create_model
 from torchvision import transforms
@@ -87,6 +87,16 @@ def _find_last_conv_layer(module: nn.Module) -> nn.Module:
     return last
 
 
+def _add_label(img_rgb_uint8: np.ndarray, text: str) -> np.ndarray:
+    """Overlay a readable text label onto the top-left of an image."""
+    img = Image.fromarray(img_rgb_uint8)
+    draw = ImageDraw.Draw(img)
+    font = ImageFont.load_default()
+    # Text with stroke for contrast
+    draw.text((6, 6), text, fill=(255, 255, 255), stroke_width=2, stroke_fill=(0, 0, 0), font=font)
+    return np.asarray(img)
+
+
 # ---------------------------------------------------------------------
 # Model setup
 # ---------------------------------------------------------------------
@@ -119,10 +129,10 @@ efficientformer_model.load_state_dict(
 efficientformer_model.to(DEVICE).eval()
 
 # ---------------------------------------------------------------------
-# Inference + Grad-CAM (overlay from EFV2)
+# Inference + Grad-CAM (show CAM from each model side by side)
 # ---------------------------------------------------------------------
 def predict_and_visualize(image: Image.Image) -> tuple[np.ndarray, str]:
-    # EfficientNet
+    # EfficientNet prediction
     with torch.inference_mode():
         x_en = TRANSFORM_IMAGENET(image).unsqueeze(0).to(DEVICE)
         logits_en = efficientnet_model(x_en)
@@ -131,7 +141,7 @@ def predict_and_visualize(image: Image.Image) -> tuple[np.ndarray, str]:
         conf_en = float(probs_en[0, cls_en] * 100.0)
         label_en = CLASS_LABELS.get(cls_en, f"class_{cls_en}")
 
-    # FasterViT
+    # FasterViT prediction
     with torch.inference_mode():
         x_fv = TRANSFORM_IMAGENET(image).unsqueeze(0).to(DEVICE)
         logits_fv = faster_vit_model(x_fv)
@@ -140,7 +150,7 @@ def predict_and_visualize(image: Image.Image) -> tuple[np.ndarray, str]:
         conf_fv = float(probs_fv[0, cls_fv] * 100.0)
         label_fv = CLASS_LABELS.get(cls_fv, f"class_{cls_fv}")
 
-    # EfficientFormerV2-S1 (prediction + Grad-CAM)
+    # EfficientFormerV2-S1 prediction
     with torch.inference_mode():
         x_ef = TRANSFORM_NO_NORM(image).unsqueeze(0).to(DEVICE)
         probs_ef = F.softmax(efficientformer_model(x_ef), dim=1)
@@ -148,16 +158,39 @@ def predict_and_visualize(image: Image.Image) -> tuple[np.ndarray, str]:
         conf_ef = float(probs_ef[0, cls_ef] * 100.0)
         label_ef = CLASS_LABELS.get(cls_ef, f"class_{cls_ef}")
 
-    x_cam, rgb = _prepare_for_cam(image, img_size=224, normalize=False)
-    target_layer = _find_last_conv_layer(efficientformer_model)
-    target_class = cls_ef
+    # Grad-CAM: one overlay per model
+    # EfficientNet CAM
+    x_cam_en, rgb_en = _prepare_for_cam(image, img_size=224, normalize=True)
+    target_layer_en = efficientnet_model._conv_head
+    with GradCAM(model=efficientnet_model, target_layers=[target_layer_en]) as cam_en:
+        gray_en = cam_en(input_tensor=x_cam_en, targets=[ClassifierOutputTarget(cls_en)])[0]
+    overlay_en = show_cam_on_image(rgb_en, gray_en, use_rgb=True)
+    panel_en = _add_label(
+        overlay_en, f"EfficientNet-B3 • {label_en} ({conf_en:.1f}%)"
+    )
 
-    with GradCAM(model=efficientformer_model, target_layers=[target_layer]) as cam:
-        grayscale = cam(
-            input_tensor=x_cam, targets=[ClassifierOutputTarget(target_class)]
-        )[0]
-    overlay = show_cam_on_image(rgb, grayscale, use_rgb=True)  # uint8 HWC
-    side_by_side = np.concatenate([(rgb * 255).astype(np.uint8), overlay], axis=1)
+    # FasterViT CAM (last conv found in the model)
+    x_cam_fv, rgb_fv = _prepare_for_cam(image, img_size=224, normalize=True)
+    target_layer_fv = _find_last_conv_layer(faster_vit_model)
+    with GradCAM(model=faster_vit_model, target_layers=[target_layer_fv]) as cam_fv:
+        gray_fv = cam_fv(input_tensor=x_cam_fv, targets=[ClassifierOutputTarget(cls_fv)])[0]
+    overlay_fv = show_cam_on_image(rgb_fv, gray_fv, use_rgb=True)
+    panel_fv = _add_label(
+        overlay_fv, f"FasterViT • {label_fv} ({conf_fv:.1f}%)"
+    )
+
+    # EfficientFormerV2-S1 CAM
+    x_cam_ef, rgb_ef = _prepare_for_cam(image, img_size=224, normalize=False)
+    target_layer_ef = _find_last_conv_layer(efficientformer_model)
+    with GradCAM(model=efficientformer_model, target_layers=[target_layer_ef]) as cam_ef:
+        gray_ef = cam_ef(input_tensor=x_cam_ef, targets=[ClassifierOutputTarget(cls_ef)])[0]
+    overlay_ef = show_cam_on_image(rgb_ef, gray_ef, use_rgb=True)
+    panel_ef = _add_label(
+        overlay_ef, f"EfficientFormerV2-S1 • {label_ef} ({conf_ef:.1f}%)"
+    )
+
+    # Concatenate panels horizontally
+    side_by_side = np.concatenate([panel_en, panel_fv, panel_ef], axis=1)
 
     summary = (
         f"EfficientNet-B3: {label_en} ({conf_en:.2f}% confidence)\n"
