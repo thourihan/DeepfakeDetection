@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
@@ -19,7 +20,7 @@ from pytorch_grad_cam.utils.image import show_cam_on_image
 from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 
 # ---------------------------------------------------------------------
-# Device & weights (case-sensitive path)
+# Device, weights, and export settings (case-sensitive paths)
 # ---------------------------------------------------------------------
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -33,6 +34,11 @@ for p in (EN_WEIGHTS, FV_WEIGHTS, EFV2_WEIGHTS):
         raise FileNotFoundError(
             f"Missing weights: {p}. Expected under {WEIGHTS_DIR.resolve()}."
         )
+
+
+EXPORT_SCALE = 2
+EXPORT_DIR = Path("outputs") / "cam_exports"
+EXPORT_DIR.mkdir(parents=True, exist_ok=True)
 
 # ---------------------------------------------------------------------
 # Labels & preprocessing
@@ -92,7 +98,6 @@ def _add_label(img_rgb_uint8: np.ndarray, text: str) -> np.ndarray:
     img = Image.fromarray(img_rgb_uint8)
     draw = ImageDraw.Draw(img)
     font = ImageFont.load_default()
-    # Text with stroke for contrast
     draw.text((6, 6), text, fill=(255, 255, 255), stroke_width=2, stroke_fill=(0, 0, 0), font=font)
     return np.asarray(img)
 
@@ -166,7 +171,7 @@ def predict_and_visualize(image: Image.Image) -> tuple[np.ndarray, str]:
         gray_en = cam_en(input_tensor=x_cam_en, targets=[ClassifierOutputTarget(cls_en)])[0]
     overlay_en = show_cam_on_image(rgb_en, gray_en, use_rgb=True)
     panel_en = _add_label(
-        overlay_en, f"EfficientNet-B3 • {label_en} ({conf_en:.1f}%)"
+        overlay_en, f"EfficientNet-B3 {label_en} ({conf_en:.1f}%)"
     )
 
     # FasterViT CAM (last conv found in the model)
@@ -176,7 +181,7 @@ def predict_and_visualize(image: Image.Image) -> tuple[np.ndarray, str]:
         gray_fv = cam_fv(input_tensor=x_cam_fv, targets=[ClassifierOutputTarget(cls_fv)])[0]
     overlay_fv = show_cam_on_image(rgb_fv, gray_fv, use_rgb=True)
     panel_fv = _add_label(
-        overlay_fv, f"FasterViT • {label_fv} ({conf_fv:.1f}%)"
+        overlay_fv, f"FasterViT {label_fv} ({conf_fv:.1f}%)"
     )
 
     # EfficientFormerV2-S1 CAM
@@ -186,18 +191,28 @@ def predict_and_visualize(image: Image.Image) -> tuple[np.ndarray, str]:
         gray_ef = cam_ef(input_tensor=x_cam_ef, targets=[ClassifierOutputTarget(cls_ef)])[0]
     overlay_ef = show_cam_on_image(rgb_ef, gray_ef, use_rgb=True)
     panel_ef = _add_label(
-        overlay_ef, f"EfficientFormerV2-S1 • {label_ef} ({conf_ef:.1f}%)"
+        overlay_ef, f"EfficientFormerV2-S1 {label_ef} ({conf_ef:.1f}%)"
     )
 
     # Concatenate panels horizontally
     side_by_side = np.concatenate([panel_en, panel_fv, panel_ef], axis=1)
 
+    # Export high-res image
+    h, w, _ = side_by_side.shape
+    export_img = Image.fromarray(side_by_side).resize(
+        (w * EXPORT_SCALE, h * EXPORT_SCALE), resample=Image.BICUBIC
+    )
+    out_path = EXPORT_DIR / f"cam_triptych_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+    export_img.save(out_path, format="PNG", optimize=True)
+
+    # Return upscaled image to Gradio as well
     summary = (
         f"EfficientNet-B3: {label_en} ({conf_en:.2f}% confidence)\n"
         f"FasterViT: {label_fv} ({conf_fv:.2f}% confidence)\n"
-        f"EfficientFormerV2-S1: {label_ef} ({conf_ef:.2f}% confidence)"
+        f"EfficientFormerV2-S1: {label_ef} ({conf_ef:.2f}% confidence)\n"
+        f"Saved: {out_path.resolve()}"
     )
-    return side_by_side, summary
+    return np.asarray(export_img), summary
 
 
 # ---------------------------------------------------------------------
