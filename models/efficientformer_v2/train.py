@@ -1,4 +1,17 @@
 from __future__ import annotations
+"""
+Supervised training script for EfficientFormerV2-S1 on a Real/Fake dataset.
+
+Expected layout (ImageFolder-compatible):
+    DATA_ROOT/
+        Train/{Real,Fake}/...
+        Validation/{Real,Fake}/...
+
+Training regime:
+- Warm up by training only the classification head.
+- Then unfreeze selected late-stage layers and fine-tune.
+- Uses AMP on CUDA (if available) and channels_last for potential throughput gains.
+"""
 
 from pathlib import Path
 from time import perf_counter
@@ -21,16 +34,16 @@ from rich.progress import (
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
-# CONSTANTS
+# TODO: define this data in a config
 DATA_ROOT: Path = Path.home() / "code" / "DeepfakeDetection" / "data" / "Dataset"
 MODEL_NAME: str = "efficientformerv2_s1"
 EPOCHS: int = 5
 BATCH_SIZE: int = 128
 IMG_SIZE: int = 224
-NUM_WORKERS: int = 8 
+NUM_WORKERS: int = 8
 OUTPUT_WEIGHTS: Path = Path("EfficientFormerV2_S1.pth")
 
-# Layers to unfreeze after warmup
+# Parameter name substrings to unfreeze after the head-only warmup.
 UNFREEZE_KEYS: tuple[str, ...] = (
     "stages.3",
     "blocks.3",
@@ -40,11 +53,13 @@ UNFREEZE_KEYS: tuple[str, ...] = (
     "classifier",
     "head",
 )
+# ---------------------------------------------------------------------- #
 
 console = Console()
 
 
 def get_loaders(data_root: Path, img_size: int, batch_size: int) -> Tuple[DataLoader, DataLoader]:
+    """Build train/validation loaders with light augmentations on train."""
     train_t = transforms.Compose(
         [
             transforms.RandomResizedCrop(img_size, scale=(0.9, 1.0)),
@@ -60,6 +75,7 @@ def get_loaders(data_root: Path, img_size: int, batch_size: int) -> Tuple[DataLo
             transforms.ToTensor(),
         ],
     )
+
     train_ds = datasets.ImageFolder(data_root / "Train", transform=train_t)
     val_ds = datasets.ImageFolder(data_root / "Validation", transform=val_t)
 
@@ -83,6 +99,7 @@ def get_loaders(data_root: Path, img_size: int, batch_size: int) -> Tuple[DataLo
 
 
 def evaluate(model: nn.Module, dl: DataLoader, device: str) -> float:
+    """Compute top-1 accuracy on the given dataloader."""
     model.eval()
     correct = 0
     total = 0
@@ -108,6 +125,7 @@ def train_one_epoch(
     progress: Progress,
     task: TaskID,
 ) -> None:
+    """Single-epoch training loop with AMP and live throughput reporting."""
     model.train()
     start = perf_counter()
     for i, (x, y) in enumerate(dl, 1):
@@ -120,15 +138,20 @@ def train_one_epoch(
         scaler.step(opt)
         scaler.update()
 
-        # live imgs/sec
+        # Report instantaneous images/sec and loss on the progress bar.
         elapsed = perf_counter() - start
         seen = min(i * dl.batch_size, len(dl.dataset))
         ips = seen / max(1e-6, elapsed)
-        progress.update(task, advance=1, description=f"train | loss={loss.item():.4f} | {ips:.0f} img/s")
+        progress.update(
+            task,
+            advance=1,
+            description=f"train | loss={loss.item():.4f} | {ips:.0f} img/s",
+        )
 
 
 def main() -> None:
-    # Device info
+    """Entrypoint: device setup, data, warmup, fine-tune, save weights."""
+    # Device selection and basic info.
     use_cuda = torch.cuda.is_available()
     device = "cuda" if use_cuda else "cpu"
     if use_cuda:
@@ -137,7 +160,7 @@ def main() -> None:
     else:
         console.print("[bold yellow]⚠️  CUDA not available[/]: falling back to CPU")
 
-    # Data presence
+    # Dataset presence check (ImageFolder structure required).
     if not (DATA_ROOT / "Train").exists() or not (DATA_ROOT / "Validation").exists():
         console.print(f"[bold red]Dataset not found under[/] {DATA_ROOT}")
         console.print("Expected: Dataset/Train/{Real,Fake} and Dataset/Validation/{Real,Fake}")
@@ -149,12 +172,12 @@ def main() -> None:
         f"bs={BATCH_SIZE} | steps/epoch={len(train_dl)}",
     )
 
-    # Model
+    # Model: start from ImageNet-pretrained backbone; set 2-class head.
     model = timm.create_model(MODEL_NAME, pretrained=True, num_classes=2)
     model.to(memory_format=torch.channels_last)
     model = model.to(device)
 
-    # Freeze everything and train only the head first
+    # Phase 1: freeze backbone, train classification head only.
     for name, param in model.named_parameters():
         param.requires_grad = ("classifier" in name) or ("head" in name)
 
@@ -163,7 +186,7 @@ def main() -> None:
     opt = optim.AdamW(head_params, lr=3e-4, weight_decay=5e-2)
     scaler = torch.amp.GradScaler(enabled=use_cuda)
 
-    # Rich progress setup
+    # Progress UI.
     progress = Progress(
         TextColumn("[bold blue]{task.description}"),
         BarColumn(bar_width=None),
@@ -176,12 +199,8 @@ def main() -> None:
     )
 
     with progress:
-        # Warmup epoch (head only)
-        warmup_task = progress.add_task(
-            "warmup",
-            total=len(train_dl),
-            extra="",
-        )
+        # Warmup epoch (head only).
+        warmup_task = progress.add_task("warmup", total=len(train_dl), extra="")
         console.print("[bold]Warmup (head only)[/]")
         start = perf_counter()
 
@@ -199,9 +218,14 @@ def main() -> None:
             elapsed = perf_counter() - start
             seen = min(i * train_dl.batch_size, len(train_dl.dataset))
             ips = seen / max(1e-6, elapsed)
-            progress.update(warmup_task, advance=1, description=f"warmup | loss={loss.item():.4f}", extra=f"{ips:.0f} img/s")
+            progress.update(
+                warmup_task,
+                advance=1,
+                description=f"warmup | loss={loss.item():.4f}",
+                extra=f"{ips:.0f} img/s",
+            )
 
-        # Unfreeze last stage and head, train remaining epochs
+        # Phase 2: unfreeze late-stage layers + head and fine-tune.
         for p in model.parameters():
             p.requires_grad = False
         for name, p in model.named_parameters():
