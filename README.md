@@ -1,5 +1,12 @@
 # Deepfake Image Detection with EfficientNet, FasterViT, and EfficientFormerV2
 
+![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
+![License](https://img.shields.io/github/license/thourihan/DeepfakeDetection.svg)
+![GitHub release](https://img.shields.io/github/v/release/thourihan/DeepfakeDetection.svg)
+![Last Commit](https://img.shields.io/github/last-commit/thourihan/DeepfakeDetection.svg)
+![Stars](https://img.shields.io/github/stars/thourihan/DeepfakeDetection?style=social)
+![Framework](https://img.shields.io/badge/framework-PyTorch-red.svg)
+
 ## Project Overview
 This project detects deepfake images using modern CNN/ViT-family backbones. We use EfficientNet, FasterViT, and EfficientFormerV2-S1 to balance speed and accuracy, and to diversify architectures to reduce brittleness to dataset-specific artifacts. Models are integrated via `timm`, with reproducible training/evaluation and Grad-CAM visualizations.
 
