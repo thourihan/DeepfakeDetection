@@ -1,0 +1,8 @@
+# Ignore data directory
+data/
+
+# Ignore virtual environment
+venv/
+
+# Ignore weights
+*.pth
