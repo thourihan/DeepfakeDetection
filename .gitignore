@@ -1,5 +1,11 @@
-# Ignore virtual environment directories
-.venv
-
-# Ignore data directories
+# Ignore data directory
 data/
+
+# Ignore virtual environment
+venv/
+
+# Ignore weights
+*.pth
+
+# Ignore outputs 
+outputs/
