@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 """
-Minimal evaluation + Grad-CAM visualization for EfficientFormerV2 on a
+Minimal evaluation + Grad-CAM visualization for FasterViT-2-224 on a
 Real/Fake test set. Expects a folder layout compatible with
 torchvision.datasets.ImageFolder:
 
@@ -12,8 +12,8 @@ torchvision.datasets.ImageFolder:
             *.jpg|*.png|...
 
 Notes:
-- Transforms intentionally omit normalization to mirror training/eval.
-- Grad-CAM uses the model's predicted class by default; override with
+- Uses ImageNet normalization (matches FasterViT training).
+- Grad-CAM targets the model's predicted class by default; override with
   `class_idx` if you need a specific target.
 """
 
@@ -23,9 +23,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
-import timm
 import torch
 import torch.nn as nn
+from fastervit import create_model
 from PIL import Image
 from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.image import show_cam_on_image
@@ -42,22 +42,17 @@ from rich.progress import (
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
+# Paths (hardcoded to your environment)
 DATA_ROOT: Path = (
     Path.home() / "code" / "DeepfakeDetection" / "data" / "Dataset" / "Test"
 )
-
-# timm model identifier and local weights to load.
-MODEL_NAME: str = "efficientformerv2_s1"
-WEIGHTS_PATH: Path = (
-    Path.home()
-    / "code"
-    / "DeepfakeDetection"
-    / "models"
-    / "efficientformer_v2"
-    / "EfficientFormerV2_S1.pth"
+CKPT_PATH: Path = Path(
+    "/home/tim/code/DeepfakeDetection/models/fastervit/fastervit_best.ckpt"
 )
 
-# TODO: Move constants below to a config file.
+# Model config
+MODEL_NAME: str = "faster_vit_2_224"
+
 # Evaluation and CAM parameters.
 BATCH_SIZE: int = 128
 IMG_SIZE: int = 224
@@ -65,6 +60,16 @@ NUM_WORKERS: int = 8
 N_CAM_SAMPLES: int = 5
 OUTPUT_DIR: Path = (
     Path.home() / "code" / "DeepfakeDetection" / "outputs" / "cam_samples"
+)
+
+# Transforms (FasterViT uses ImageNet normalization)
+TRANSFORM_IMAGENET = transforms.Compose(
+    [
+        transforms.Resize(256),
+        transforms.CenterCrop(IMG_SIZE),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    ]
 )
 
 console = Console()
@@ -79,26 +84,14 @@ class EvalResult:
     correct: int
 
 
-def get_test_loader(root: Path, img_size: int) -> DataLoader:
-    """Create a DataLoader over `root` using ImageFolder.
-
-    Transforms:
-        - Resize -> CenterCrop -> ToTensor (no normalization).
-          Keep this consistent with training/evaluation.
-    """
+def get_test_loader(root: Path) -> DataLoader:
+    """Create a DataLoader over `root` using ImageFolder with ImageNet norm."""
     if not root.exists():
         console.print(f"[bold red]Test folder not found:[/] {root}")
         console.print("Expected structure: Dataset/Test/{Real,Fake}")
         raise SystemExit(1)
 
-    t = transforms.Compose(
-        [
-            transforms.Resize(img_size),
-            transforms.CenterCrop(img_size),
-            transforms.ToTensor(),  # consistent with training/eval (no normalization)
-        ],
-    )
-    ds = datasets.ImageFolder(root, transform=t)
+    ds = datasets.ImageFolder(root, transform=TRANSFORM_IMAGENET)
     dl = DataLoader(
         ds,
         batch_size=BATCH_SIZE,
@@ -110,11 +103,21 @@ def get_test_loader(root: Path, img_size: int) -> DataLoader:
     return dl
 
 
-def build_model(model_name: str, num_classes: int, device: str) -> nn.Module:
-    """Instantiate timm model, load weights, switch to eval+channels_last."""
-    model = timm.create_model(model_name, pretrained=False, num_classes=num_classes)
-    sd = torch.load(WEIGHTS_PATH, map_location=device)
-    model.load_state_dict(sd, strict=True)
+def build_model(num_classes: int, device: str) -> nn.Module:
+    """Instantiate FasterViT, load checkpoint weights, set eval/channels_last."""
+    if not CKPT_PATH.exists():
+        console.print(f"[bold red]Checkpoint not found:[/] {CKPT_PATH}")
+        raise SystemExit(1)
+
+    # Create model skeleton (no pretrained download needed for eval)
+    model = create_model(MODEL_NAME, pretrained=False)
+    in_features = model.head.in_features  # type: ignore[attr-defined]
+    model.head = nn.Linear(in_features, num_classes)  # type: ignore[attr-defined]
+
+    ckpt = torch.load(CKPT_PATH, map_location=device)
+    state_dict = ckpt["model"] if isinstance(ckpt, dict) and "model" in ckpt else ckpt
+    model.load_state_dict(state_dict, strict=True)
+
     model.to(memory_format=torch.channels_last)
     model = model.to(device)
     model.eval()
@@ -149,10 +152,7 @@ def evaluate_with_progress(model: nn.Module, dl: DataLoader, device: str) -> Eva
 
 
 def find_last_conv_layer(module: nn.Module) -> nn.Module:
-    """Return the last nn.Conv2d encountered in the module.
-
-    Some modern backbones use few explicit convs; adjust if needed.
-    """
+    """Return the last nn.Conv2d encountered in the module."""
     last_conv: nn.Module | None = None
     for m in module.modules():
         if isinstance(m, nn.Conv2d):
@@ -171,30 +171,18 @@ def sample_test_images(root: Path, n: int) -> list[Path]:
     return random.sample(all_files, k=min(n, len(all_files)))
 
 
-def load_image_for_cam(path: Path, img_size: int) -> tuple[torch.Tensor, np.ndarray]:
-    """Load an image for inference and CAM overlay.
-
-    Returns:
-        x: (1, 3, H, W) tensor after Resize+CenterCrop+ToTensor.
-        rgb: HWC float32 in [0,1] for overlay composition.
-
-    Keep the spatial transforms synchronized with the model input to avoid
-    CAM misalignment.
-    """
+def load_image_for_cam(path: Path) -> tuple[torch.Tensor, np.ndarray]:
+    """Load an image for inference and CAM overlay (keeps transforms aligned)."""
     img = Image.open(path).convert("RGB")
-    t = transforms.Compose(
-        [
-            transforms.Resize(img_size),
-            transforms.CenterCrop(img_size),
-            transforms.ToTensor(),
-        ]
+
+    # For model input (normalized)
+    x = TRANSFORM_IMAGENET(img).unsqueeze(0)  # (1, 3, H, W)
+
+    # For overlay (RGB float in [0,1] after spatial ops)
+    pil_rc = transforms.Compose(
+        [transforms.Resize(256), transforms.CenterCrop(IMG_SIZE)]
     )
-    x = t(img).unsqueeze(0)  # (1, 3, H, W)
-    # The overlay path uses a direct PIL resize to IMG_SIZE; this matches the
-    # spatial size of `x` after the Compose above.
-    rgb = (
-        np.array(img.resize((img_size, img_size))).astype(np.float32) / 255.0
-    )  # HWC in [0,1]
+    rgb = np.asarray(pil_rc(img), dtype=np.float32) / 255.0  # HWC in [0,1]
     return x, rgb
 
 
@@ -206,11 +194,7 @@ def make_cam_overlays(
     paths: Iterable[Path],
     out_dir: Path,
 ) -> None:
-    """Generate side-by-side original/CAM overlays for the given image paths.
-
-    - `class_idx=None` targets the model's argmax per image.
-    - Uses a context manager to guarantee hook cleanup.
-    """
+    """Generate side-by-side original/CAM overlays for the given image paths."""
     out_dir.mkdir(parents=True, exist_ok=True)
 
     progress = Progress(
@@ -223,12 +207,11 @@ def make_cam_overlays(
         transient=False,
     )
 
-    # Ensure hooks are released promptly (avoids __del__ warnings).
     with GradCAM(model=model, target_layers=[target_layer]) as cam, progress:
         task = progress.add_task("grad-cam", total=len(list(paths)))
         for i, path in enumerate(paths, 1):
-            x, rgb = load_image_for_cam(path, IMG_SIZE)
-            x = x.to(device, non_blocking=True)
+            x, rgb = load_image_for_cam(path)
+            x = x.to(device, non_blocking=True).to(memory_format=torch.channels_last)
 
             with torch.inference_mode():
                 logits = model(x)
@@ -260,15 +243,15 @@ def main() -> None:
         console.print("[bold yellow]⚠️  CUDA not available[/]: falling back to CPU")
 
     # Data & model
-    dl = get_test_loader(DATA_ROOT, IMG_SIZE)
+    dl = get_test_loader(DATA_ROOT)
     num_classes = len(dl.dataset.classes)
     console.print(f"[bold]Classes[/]: {dl.dataset.classes} (num_classes={num_classes})")
 
-    if not WEIGHTS_PATH.exists():
-        console.print(f"[bold red]Weights not found:[/] {WEIGHTS_PATH}")
+    if not CKPT_PATH.exists():
+        console.print(f"[bold red]Weights not found:[/] {CKPT_PATH}")
         raise SystemExit(1)
 
-    model = build_model(MODEL_NAME, num_classes, device)
+    model = build_model(num_classes, device)
 
     # Evaluate with a progress bar
     res = evaluate_with_progress(model, dl, device)

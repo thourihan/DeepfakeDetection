@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Optional, Tuple
 
 import gradio as gr
 import numpy as np
@@ -10,14 +9,13 @@ import timm
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from PIL import Image, ImageDraw, ImageFont
 from efficientnet_pytorch import EfficientNet
 from fastervit import create_model
-from torchvision import transforms
-
+from PIL import Image, ImageDraw, ImageFont
 from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.image import show_cam_on_image
 from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
+from torchvision import transforms
 
 # ---------------------------------------------------------------------
 # Device, weights, and export settings (case-sensitive paths)
@@ -43,7 +41,7 @@ EXPORT_DIR.mkdir(parents=True, exist_ok=True)
 # ---------------------------------------------------------------------
 # Labels & preprocessing
 # ---------------------------------------------------------------------
-CLASS_LABELS: Dict[int, str] = {0: "fake", 1: "real"}
+CLASS_LABELS: dict[int, str] = {0: "fake", 1: "real"}
 
 # ImageNet normalization (EfficientNet/FasterViT).
 TRANSFORM_IMAGENET = transforms.Compose(
@@ -70,7 +68,7 @@ TRANSFORM_NO_NORM = transforms.Compose(
 
 def _prepare_for_cam(
     image: Image.Image, img_size: int, normalize: bool
-) -> Tuple[torch.Tensor, np.ndarray]:
+) -> tuple[torch.Tensor, np.ndarray]:
     """Return (input_tensor, rgb_float) with aligned spatial transforms."""
     t = TRANSFORM_IMAGENET if normalize else TRANSFORM_NO_NORM
     pil_rc = transforms.Compose(
@@ -84,7 +82,7 @@ def _prepare_for_cam(
 
 def _find_last_conv_layer(module: nn.Module) -> nn.Module:
     """Pick the last Conv2d for Grad-CAM target."""
-    last: Optional[nn.Module] = None
+    last: nn.Module | None = None
     for m in module.modules():
         if isinstance(m, nn.Conv2d):
             last = m
@@ -98,7 +96,14 @@ def _add_label(img_rgb_uint8: np.ndarray, text: str) -> np.ndarray:
     img = Image.fromarray(img_rgb_uint8)
     draw = ImageDraw.Draw(img)
     font = ImageFont.load_default()
-    draw.text((6, 6), text, fill=(255, 255, 255), stroke_width=2, stroke_fill=(0, 0, 0), font=font)
+    draw.text(
+        (6, 6),
+        text,
+        fill=(255, 255, 255),
+        stroke_width=2,
+        stroke_fill=(0, 0, 0),
+        font=font,
+    )
     return np.asarray(img)
 
 
@@ -109,18 +114,14 @@ def _add_label(img_rgb_uint8: np.ndarray, text: str) -> np.ndarray:
 efficientnet_model = EfficientNet.from_pretrained("efficientnet-b3")
 _en_in = efficientnet_model._fc.in_features
 efficientnet_model._fc = nn.Linear(_en_in, 2)
-efficientnet_model.load_state_dict(
-    torch.load(EN_WEIGHTS, map_location="cpu")
-)
+efficientnet_model.load_state_dict(torch.load(EN_WEIGHTS, map_location="cpu"))
 efficientnet_model.to(DEVICE).eval()
 
 # FasterViT
 faster_vit_model = create_model("faster_vit_2_224", pretrained=False, model_path=None)
 _fv_in = faster_vit_model.head.in_features
 faster_vit_model.head = nn.Linear(_fv_in, 2)
-faster_vit_model.load_state_dict(
-    torch.load(FV_WEIGHTS, map_location="cpu")
-)
+faster_vit_model.load_state_dict(torch.load(FV_WEIGHTS, map_location="cpu"))
 faster_vit_model.to(DEVICE).eval()
 
 # EfficientFormerV2-S1 via timm
@@ -132,6 +133,7 @@ efficientformer_model.load_state_dict(
     strict=True,
 )
 efficientformer_model.to(DEVICE).eval()
+
 
 # ---------------------------------------------------------------------
 # Inference + Grad-CAM (show CAM from each model side by side)
@@ -168,27 +170,31 @@ def predict_and_visualize(image: Image.Image) -> tuple[np.ndarray, str]:
     x_cam_en, rgb_en = _prepare_for_cam(image, img_size=224, normalize=True)
     target_layer_en = efficientnet_model._conv_head
     with GradCAM(model=efficientnet_model, target_layers=[target_layer_en]) as cam_en:
-        gray_en = cam_en(input_tensor=x_cam_en, targets=[ClassifierOutputTarget(cls_en)])[0]
+        gray_en = cam_en(
+            input_tensor=x_cam_en, targets=[ClassifierOutputTarget(cls_en)]
+        )[0]
     overlay_en = show_cam_on_image(rgb_en, gray_en, use_rgb=True)
-    panel_en = _add_label(
-        overlay_en, f"EfficientNet-B3 {label_en} ({conf_en:.1f}%)"
-    )
+    panel_en = _add_label(overlay_en, f"EfficientNet-B3 {label_en} ({conf_en:.1f}%)")
 
     # FasterViT CAM (last conv found in the model)
     x_cam_fv, rgb_fv = _prepare_for_cam(image, img_size=224, normalize=True)
     target_layer_fv = _find_last_conv_layer(faster_vit_model)
     with GradCAM(model=faster_vit_model, target_layers=[target_layer_fv]) as cam_fv:
-        gray_fv = cam_fv(input_tensor=x_cam_fv, targets=[ClassifierOutputTarget(cls_fv)])[0]
+        gray_fv = cam_fv(
+            input_tensor=x_cam_fv, targets=[ClassifierOutputTarget(cls_fv)]
+        )[0]
     overlay_fv = show_cam_on_image(rgb_fv, gray_fv, use_rgb=True)
-    panel_fv = _add_label(
-        overlay_fv, f"FasterViT {label_fv} ({conf_fv:.1f}%)"
-    )
+    panel_fv = _add_label(overlay_fv, f"FasterViT {label_fv} ({conf_fv:.1f}%)")
 
     # EfficientFormerV2-S1 CAM
     x_cam_ef, rgb_ef = _prepare_for_cam(image, img_size=224, normalize=False)
     target_layer_ef = _find_last_conv_layer(efficientformer_model)
-    with GradCAM(model=efficientformer_model, target_layers=[target_layer_ef]) as cam_ef:
-        gray_ef = cam_ef(input_tensor=x_cam_ef, targets=[ClassifierOutputTarget(cls_ef)])[0]
+    with GradCAM(
+        model=efficientformer_model, target_layers=[target_layer_ef]
+    ) as cam_ef:
+        gray_ef = cam_ef(
+            input_tensor=x_cam_ef, targets=[ClassifierOutputTarget(cls_ef)]
+        )[0]
     overlay_ef = show_cam_on_image(rgb_ef, gray_ef, use_rgb=True)
     panel_ef = _add_label(
         overlay_ef, f"EfficientFormerV2-S1 {label_ef} ({conf_ef:.1f}%)"
@@ -202,7 +208,9 @@ def predict_and_visualize(image: Image.Image) -> tuple[np.ndarray, str]:
     export_img = Image.fromarray(side_by_side).resize(
         (w * EXPORT_SCALE, h * EXPORT_SCALE), resample=Image.BICUBIC
     )
-    out_path = EXPORT_DIR / f"cam_triptych_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+    out_path = (
+        EXPORT_DIR / f"cam_triptych_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+    )
     export_img.save(out_path, format="PNG", optimize=True)
 
     # Return upscaled image to Gradio as well

@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 """
 Supervised training script for FasterViT-2-224 on a Real/Fake dataset.
 
@@ -21,11 +22,11 @@ This script saves:
 from dataclasses import dataclass
 from pathlib import Path
 from time import perf_counter
-from typing import Tuple
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from fastervit import create_model
 from rich.console import Console
 from rich.progress import (
     BarColumn,
@@ -39,14 +40,10 @@ from rich.progress import (
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
-from fastervit import create_model
-
 # ---------------------------- Config --------------------------------- #
 
 # Adjust for your environment if needed.
-DATA_ROOT: Path = (
-    Path.home() / "code" / "DeepfakeDetection" / "data" / "Dataset"
-)
+DATA_ROOT: Path = Path.home() / "code" / "DeepfakeDetection" / "data" / "Dataset"
 MODEL_NAME: str = "faster_vit_2_224"
 
 # Training hyperparameters.
@@ -83,7 +80,7 @@ class EvalResult:
 
 def get_loaders(
     data_root: Path, img_size: int, batch_size: int
-) -> Tuple[DataLoader, DataLoader]:
+) -> tuple[DataLoader, DataLoader]:
     """Build train/validation loaders. FasterViT expects ImageNet norm."""
     train_t = transforms.Compose(
         [
@@ -91,9 +88,7 @@ def get_loaders(
             transforms.RandomHorizontalFlip(),
             transforms.ColorJitter(0.1, 0.1, 0.1, 0.05),
             transforms.ToTensor(),
-            transforms.Normalize(
-                mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
-            ),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ]
     )
     val_t = transforms.Compose(
@@ -101,9 +96,7 @@ def get_loaders(
             transforms.Resize(256),
             transforms.CenterCrop(img_size),
             transforms.ToTensor(),
-            transforms.Normalize(
-                mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
-            ),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ]
     )
 
@@ -136,9 +129,7 @@ def evaluate(model: nn.Module, dl: DataLoader, device: str) -> EvalResult:
     total = 0
     with torch.inference_mode():
         for x, y in dl:
-            x = x.to(device, non_blocking=True).to(
-                memory_format=torch.channels_last
-            )
+            x = x.to(device, non_blocking=True).to(memory_format=torch.channels_last)
             y = y.to(device, non_blocking=True)
             logits = model(x)
             pred = logits.argmax(1)
@@ -169,9 +160,7 @@ def train_one_epoch(
     pending_steps = 0
 
     for i, (x, y) in enumerate(dl, 1):
-        x = x.to(device, non_blocking=True).to(
-            memory_format=torch.channels_last
-        )
+        x = x.to(device, non_blocking=True).to(memory_format=torch.channels_last)
         y = y.to(device, non_blocking=True)
 
         with torch.amp.autocast(device_type="cuda", enabled=use_cuda_amp):
@@ -288,7 +277,9 @@ def main() -> None:
         head_params = [p for p in model.parameters() if p.requires_grad]
         opt = optim.AdamW(head_params, lr=HEAD_LR, weight_decay=HEAD_WD)
 
-        warm_task = progress.add_task("warmup (head only)", total=len(train_dl), extra="")
+        warm_task = progress.add_task(
+            "warmup (head only)", total=len(train_dl), extra=""
+        )
         console.print("[bold]Warmup (head only)[/]")
         train_one_epoch(
             model=model,
@@ -306,8 +297,7 @@ def main() -> None:
         # Validate after warmup
         res = evaluate(model, val_dl, device)
         console.print(
-            f"[bold cyan]warmup[/] | val_acc={res.acc:.4f} "
-            f"({res.correct}/{res.total})"
+            f"[bold cyan]warmup[/] | val_acc={res.acc:.4f} ({res.correct}/{res.total})"
         )
         best_val_acc = res.acc
         best_epoch = 0
@@ -341,14 +331,10 @@ def main() -> None:
             lr=FT_LR,
             weight_decay=FT_WD,
         )
-        scheduler = optim.lr_scheduler.CosineAnnealingLR(
-            opt, T_max=max(1, EPOCHS - 1)
-        )
+        scheduler = optim.lr_scheduler.CosineAnnealingLR(opt, T_max=max(1, EPOCHS - 1))
 
         for epoch in range(1, EPOCHS + 1):
-            task = progress.add_task(
-                f"epoch {epoch}", total=len(train_dl), extra=""
-            )
+            task = progress.add_task(f"epoch {epoch}", total=len(train_dl), extra="")
             train_one_epoch(
                 model=model,
                 dl=train_dl,

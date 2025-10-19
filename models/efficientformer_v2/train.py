@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 """
 Supervised training script for EfficientFormerV2-S1 on a Real/Fake dataset.
 
@@ -15,7 +16,6 @@ Training regime:
 
 from pathlib import Path
 from time import perf_counter
-from typing import Tuple
 
 import timm
 import torch
@@ -58,7 +58,9 @@ UNFREEZE_KEYS: tuple[str, ...] = (
 console = Console()
 
 
-def get_loaders(data_root: Path, img_size: int, batch_size: int) -> Tuple[DataLoader, DataLoader]:
+def get_loaders(
+    data_root: Path, img_size: int, batch_size: int
+) -> tuple[DataLoader, DataLoader]:
     """Build train/validation loaders with light augmentations on train."""
     train_t = transforms.Compose(
         [
@@ -163,7 +165,9 @@ def main() -> None:
     # Dataset presence check (ImageFolder structure required).
     if not (DATA_ROOT / "Train").exists() or not (DATA_ROOT / "Validation").exists():
         console.print(f"[bold red]Dataset not found under[/] {DATA_ROOT}")
-        console.print("Expected: Dataset/Train/{Real,Fake} and Dataset/Validation/{Real,Fake}")
+        console.print(
+            "Expected: Dataset/Train/{Real,Fake} and Dataset/Validation/{Real,Fake}"
+        )
         raise SystemExit(1)
 
     train_dl, val_dl = get_loaders(DATA_ROOT, IMG_SIZE, BATCH_SIZE)
@@ -232,12 +236,26 @@ def main() -> None:
             if any(key in name for key in UNFREEZE_KEYS):
                 p.requires_grad = True
 
-        opt = optim.AdamW((p for p in model.parameters() if p.requires_grad), lr=1e-4, weight_decay=5e-2)
+        opt = optim.AdamW(
+            (p for p in model.parameters() if p.requires_grad),
+            lr=1e-4,
+            weight_decay=5e-2,
+        )
         scheduler = optim.lr_scheduler.CosineAnnealingLR(opt, T_max=max(1, EPOCHS - 1))
 
         for epoch in range(1, EPOCHS):
             task = progress.add_task(f"epoch {epoch}", total=len(train_dl), extra="")
-            train_one_epoch(model, train_dl, opt, scaler, criterion, device, use_cuda, progress, task)
+            train_one_epoch(
+                model,
+                train_dl,
+                opt,
+                scaler,
+                criterion,
+                device,
+                use_cuda,
+                progress,
+                task,
+            )
             scheduler.step()
             acc = evaluate(model, val_dl, device)
             console.print(f"[bold cyan]epoch {epoch}[/] | val_acc={acc:.4f}")
