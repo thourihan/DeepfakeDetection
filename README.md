@@ -62,7 +62,7 @@ FasterViT: real (98.55% confidence)
 ## Installation
 To set up the project, follow these steps:
 1. **Clone the repository.**
-2. **Install dependencies:** We use Python 3.11+ (tested on 3.11/3.12).  
+2. **Install dependencies:** We use Python 3.12+
    Install with:
    ```bash
    pip install -r requirements.txt
