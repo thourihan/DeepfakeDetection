@@ -6,6 +6,7 @@ venv/
 
 # Ignore weights
 *.pth
+.ckpt
 
 # Ignore outputs 
 outputs/
