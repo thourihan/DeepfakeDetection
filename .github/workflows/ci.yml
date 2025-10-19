@@ -27,9 +27,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
           cache: 'pip'
-      - name: Install pytest only (fast, no heavy deps)
+      - name: Install pytest only
         run: pip install pytest
       - name: Run smoke tests
-        run: pytest -q -k "smoke" || pytest -q  # falls back if you run full test suite later
+        run: pytest -q -k "smoke" || pytest -q
