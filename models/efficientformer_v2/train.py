@@ -1,6 +1,5 @@
-from __future__ import annotations
-"""
-Supervised training script for EfficientFormerV2-S1 on a Real/Fake dataset.
+# ruff: noqa: INP001
+"""Supervised training script for EfficientFormerV2-S1 on a Real/Fake dataset.
 
 Expected layout (ImageFolder-compatible):
     DATA_ROOT/
@@ -13,14 +12,13 @@ Training regime:
 - Uses AMP on CUDA (if available) and channels_last for potential throughput gains.
 """
 
+from __future__ import annotations
+
 from pathlib import Path
 from time import perf_counter
-from typing import Tuple
 
 import timm
 import torch
-import torch.nn as nn
-import torch.optim as optim
 from rich.console import Console
 from rich.progress import (
     BarColumn,
@@ -31,10 +29,11 @@ from rich.progress import (
     TimeElapsedColumn,
     TimeRemainingColumn,
 )
+from torch import nn, optim
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
-# TODO: define this data in a config
+# Configuration constants (could be moved to a config file).
 DATA_ROOT: Path = Path.home() / "code" / "DeepfakeDetection" / "data" / "Dataset"
 MODEL_NAME: str = "efficientformerv2_s1"
 EPOCHS: int = 5
@@ -58,7 +57,11 @@ UNFREEZE_KEYS: tuple[str, ...] = (
 console = Console()
 
 
-def get_loaders(data_root: Path, img_size: int, batch_size: int) -> Tuple[DataLoader, DataLoader]:
+def get_loaders(
+    data_root: Path,
+    img_size: int,
+    batch_size: int,
+) -> tuple[DataLoader, DataLoader]:
     """Build train/validation loaders with light augmentations on train."""
     train_t = transforms.Compose(
         [
@@ -104,23 +107,24 @@ def evaluate(model: nn.Module, dl: DataLoader, device: str) -> float:
     correct = 0
     total = 0
     with torch.inference_mode():
-        for x, y in dl:
-            x = x.to(device, non_blocking=True)
-            y = y.to(device, non_blocking=True)
-            logits = model(x)
+        for batch_x, batch_y in dl:
+            inputs = batch_x.to(device, non_blocking=True)
+            targets = batch_y.to(device, non_blocking=True)
+            logits = model(inputs)
             pred = logits.argmax(1)
-            correct += (pred == y).sum().item()
-            total += y.numel()
+            correct += (pred == targets).sum().item()
+            total += targets.numel()
     return correct / max(1, total)
 
 
-def train_one_epoch(
+def train_one_epoch(  # noqa: PLR0913
     model: nn.Module,
     dl: DataLoader,
     opt: optim.Optimizer,
     scaler: torch.amp.GradScaler,
     criterion: nn.Module,
     device: str,
+    *,
     use_cuda_amp: bool,
     progress: Progress,
     task: TaskID,
@@ -128,12 +132,14 @@ def train_one_epoch(
     """Single-epoch training loop with AMP and live throughput reporting."""
     model.train()
     start = perf_counter()
-    for i, (x, y) in enumerate(dl, 1):
-        x = x.to(device, non_blocking=True).to(memory_format=torch.channels_last)
-        y = y.to(device, non_blocking=True)
+    for i, (batch_x, batch_y) in enumerate(dl, 1):
+        inputs = batch_x.to(device, non_blocking=True).to(
+            memory_format=torch.channels_last,
+        )
+        targets = batch_y.to(device, non_blocking=True)
         opt.zero_grad(set_to_none=True)
         with torch.amp.autocast(device_type="cuda", enabled=use_cuda_amp):
-            loss = criterion(model(x), y)
+            loss = criterion(model(inputs), targets)
         scaler.scale(loss).backward()
         scaler.step(opt)
         scaler.update()
@@ -149,7 +155,7 @@ def train_one_epoch(
         )
 
 
-def main() -> None:
+def main() -> None:  # noqa: PLR0915
     """Entrypoint: device setup, data, warmup, fine-tune, save weights."""
     # Device selection and basic info.
     use_cuda = torch.cuda.is_available()
@@ -163,7 +169,9 @@ def main() -> None:
     # Dataset presence check (ImageFolder structure required).
     if not (DATA_ROOT / "Train").exists() or not (DATA_ROOT / "Validation").exists():
         console.print(f"[bold red]Dataset not found under[/] {DATA_ROOT}")
-        console.print("Expected: Dataset/Train/{Real,Fake} and Dataset/Validation/{Real,Fake}")
+        console.print(
+            "Expected: Dataset/Train/{Real,Fake} and Dataset/Validation/{Real,Fake}",
+        )
         raise SystemExit(1)
 
     train_dl, val_dl = get_loaders(DATA_ROOT, IMG_SIZE, BATCH_SIZE)
@@ -205,12 +213,14 @@ def main() -> None:
         start = perf_counter()
 
         model.train()
-        for i, (x, y) in enumerate(train_dl, 1):
-            x = x.to(device, non_blocking=True).to(memory_format=torch.channels_last)
-            y = y.to(device, non_blocking=True)
+        for i, (batch_x, batch_y) in enumerate(train_dl, 1):
+            inputs = batch_x.to(device, non_blocking=True).to(
+                memory_format=torch.channels_last,
+            )
+            targets = batch_y.to(device, non_blocking=True)
             opt.zero_grad(set_to_none=True)
             with torch.amp.autocast(device_type="cuda", enabled=use_cuda):
-                loss = criterion(model(x), y)
+                loss = criterion(model(inputs), targets)
             scaler.scale(loss).backward()
             scaler.step(opt)
             scaler.update()
@@ -232,12 +242,26 @@ def main() -> None:
             if any(key in name for key in UNFREEZE_KEYS):
                 p.requires_grad = True
 
-        opt = optim.AdamW((p for p in model.parameters() if p.requires_grad), lr=1e-4, weight_decay=5e-2)
+        opt = optim.AdamW(
+            (p for p in model.parameters() if p.requires_grad),
+            lr=1e-4,
+            weight_decay=5e-2,
+        )
         scheduler = optim.lr_scheduler.CosineAnnealingLR(opt, T_max=max(1, EPOCHS - 1))
 
         for epoch in range(1, EPOCHS):
             task = progress.add_task(f"epoch {epoch}", total=len(train_dl), extra="")
-            train_one_epoch(model, train_dl, opt, scaler, criterion, device, use_cuda, progress, task)
+            train_one_epoch(
+                model=model,
+                dl=train_dl,
+                opt=opt,
+                scaler=scaler,
+                criterion=criterion,
+                device=device,
+                use_cuda_amp=use_cuda,
+                progress=progress,
+                task=task,
+            )
             scheduler.step()
             acc = evaluate(model, val_dl, device)
             console.print(f"[bold cyan]epoch {epoch}[/] | val_acc={acc:.4f}")

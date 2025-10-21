@@ -1,6 +1,5 @@
-from __future__ import annotations
-"""
-Supervised training script for EfficientNet-B3 on a Real/Fake dataset.
+# ruff: noqa: INP001
+"""Supervised training script for EfficientNet-B3 on a Real/Fake dataset.
 
 Expected layout (ImageFolder-compatible):
     DATA_ROOT/
@@ -18,14 +17,13 @@ This script saves:
   checkpoints/efficientnet_best.ckpt
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from pathlib import Path
 from time import perf_counter
-from typing import Tuple
 
 import torch
-import torch.nn as nn
-import torch.optim as optim
 from efficientnet_pytorch import EfficientNet
 from rich.console import Console
 from rich.progress import (
@@ -37,6 +35,7 @@ from rich.progress import (
     TimeElapsedColumn,
     TimeRemainingColumn,
 )
+from torch import nn, optim
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
@@ -66,8 +65,8 @@ BEST_CKPT: Path = Path("checkpoints") / "efficientnet_best.ckpt"
 BEST_CKPT.parent.mkdir(parents=True, exist_ok=True)
 
 # Optional: gradient accumulation (helps laptops with limited VRAM)
-FT_BATCH_SIZE: int = 32          # micro-batch size during fine-tune
-EFFECTIVE_BATCH: int = 128       # desired effective batch
+FT_BATCH_SIZE: int = 32  # micro-batch size during fine-tune
+EFFECTIVE_BATCH: int = 128  # desired effective batch
 ACCUM_STEPS: int = max(1, EFFECTIVE_BATCH // FT_BATCH_SIZE)
 
 # --------------------------------------------------------------------- #
@@ -77,6 +76,8 @@ console = Console()
 
 @dataclass(frozen=True)
 class EvalResult:
+    """Container for evaluation metrics."""
+
     acc: float
     loss: float
     total: int
@@ -84,8 +85,10 @@ class EvalResult:
 
 
 def get_loaders(
-    data_root: Path, img_size: int, batch_size: int
-) -> Tuple[DataLoader, DataLoader]:
+    data_root: Path,
+    img_size: int,
+    batch_size: int,
+) -> tuple[DataLoader, DataLoader]:
     """Build train/validation loaders. EfficientNet expects ImageNet norm."""
     train_t = transforms.Compose(
         [
@@ -95,10 +98,16 @@ def get_loaders(
             transforms.ColorJitter(0.2, 0.2, 0.2, 0.05),
             transforms.ToTensor(),
             transforms.Normalize(
-                mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+                mean=[0.485, 0.456, 0.406],
+                std=[0.229, 0.224, 0.225],
             ),
-            transforms.RandomErasing(p=0.5, scale=(0.02, 0.33), ratio=(0.3, 3.3), value=0),
-        ]
+            transforms.RandomErasing(
+                p=0.5,
+                scale=(0.02, 0.33),
+                ratio=(0.3, 3.3),
+                value=0,
+            ),
+        ],
     )
     val_t = transforms.Compose(
         [
@@ -106,9 +115,10 @@ def get_loaders(
             transforms.CenterCrop(img_size),
             transforms.ToTensor(),
             transforms.Normalize(
-                mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+                mean=[0.485, 0.456, 0.406],
+                std=[0.229, 0.224, 0.225],
             ),
-        ]
+        ],
     )
 
     train_ds = datasets.ImageFolder(data_root / "Train", transform=train_t)
@@ -135,40 +145,51 @@ def get_loaders(
     return train_dl, val_dl
 
 
-def evaluate(model: nn.Module, dl: DataLoader, device: str, criterion: nn.Module) -> EvalResult:
+def evaluate(
+    model: nn.Module,
+    dl: DataLoader,
+    device: str,
+    criterion: nn.Module,
+) -> EvalResult:
     """Compute top-1 accuracy and mean loss."""
     model.eval()
     correct = 0
     total = 0
     loss_sum = 0.0
     with torch.inference_mode():
-        for x, y in dl:
-            x = x.to(device, non_blocking=True).to(memory_format=torch.channels_last)
-            y = y.to(device, non_blocking=True)
-            logits = model(x)
-            loss = criterion(logits, y)
+        for batch_x, batch_y in dl:
+            inputs = batch_x.to(device, non_blocking=True).to(
+                memory_format=torch.channels_last,
+            )
+            targets = batch_y.to(device, non_blocking=True)
+            logits = model(inputs)
+            loss = criterion(logits, targets)
             pred = logits.argmax(1)
-            correct += (pred == y).sum().item()
-            total += y.numel()
-            loss_sum += float(loss.item()) * y.size(0)
+            correct += (pred == targets).sum().item()
+            total += targets.numel()
+            loss_sum += float(loss.item()) * targets.size(0)
     acc = correct / max(1, total)
     mean_loss = loss_sum / max(1, total)
     return EvalResult(acc=acc, loss=mean_loss, total=total, correct=correct)
 
 
-def train_one_epoch(
+def train_one_epoch(  # noqa: PLR0913
     model: nn.Module,
     dl: DataLoader,
     opt: optim.Optimizer,
     scaler: torch.amp.GradScaler,
     criterion: nn.Module,
     device: str,
+    *,
     use_cuda_amp: bool,
     progress: Progress,
     task: TaskID,
     accum_steps: int = 1,
 ) -> float:
-    """Single-epoch training loop with AMP, accumulation, live throughput reporting. Returns mean train loss."""
+    """Single-epoch training loop with AMP, accumulation, and live throughput reporting.
+
+    Returns mean train loss.
+    """
     model.train()
     start = perf_counter()
     opt.zero_grad(set_to_none=True)
@@ -177,13 +198,15 @@ def train_one_epoch(
     seen_total = 0
     pending_steps = 0
 
-    for i, (x, y) in enumerate(dl, 1):
-        x = x.to(device, non_blocking=True).to(memory_format=torch.channels_last)
-        y = y.to(device, non_blocking=True)
+    for i, (batch_x, batch_y) in enumerate(dl, 1):
+        inputs = batch_x.to(device, non_blocking=True).to(
+            memory_format=torch.channels_last,
+        )
+        targets = batch_y.to(device, non_blocking=True)
 
         with torch.amp.autocast(device_type="cuda", enabled=use_cuda_amp):
-            logits = model(x)
-            loss = criterion(logits, y)
+            logits = model(inputs)
+            loss = criterion(logits, targets)
             if accum_steps > 1:
                 loss = loss / accum_steps
 
@@ -197,15 +220,15 @@ def train_one_epoch(
             pending_steps = 0
 
         # Stats
-        bsz = y.size(0)
+        bsz = targets.size(0)
         seen_total += bsz
-        loss_sum += float(loss.item()) * bsz * (accum_steps if accum_steps > 1 else 1)
+        loss_sum += float(loss.item()) * bsz * (max(1, accum_steps))
 
         # Progress bar: show unscaled loss and images/sec
         elapsed = perf_counter() - start
         seen = min(i * dl.batch_size, len(dl.dataset))
         ips = seen / max(1e-6, elapsed)
-        shown_loss = float(loss.item() * (accum_steps if accum_steps > 1 else 1))
+        shown_loss = float(loss.item() * (max(1, accum_steps)))
         progress.update(
             task,
             advance=1,
@@ -218,8 +241,7 @@ def train_one_epoch(
         scaler.update()
         opt.zero_grad(set_to_none=True)
 
-    mean_train_loss = loss_sum / max(1, seen_total)
-    return mean_train_loss
+    return loss_sum / max(1, seen_total)
 
 
 def save_best(
@@ -239,7 +261,7 @@ def save_best(
     torch.save(ckpt, BEST_CKPT)
 
 
-def main() -> None:
+def main() -> None:  # noqa: PLR0915
     """Entrypoint: data, model, warmup, fine-tune, early stop, save best."""
     # Device
     torch.backends.cudnn.benchmark = True  # faster kernels on stable shapes
@@ -254,22 +276,23 @@ def main() -> None:
     # Dataset presence check.
     if not (DATA_ROOT / "Train").exists() or not (DATA_ROOT / "Validation").exists():
         console.print(f"[bold red]Dataset not found under[/] {DATA_ROOT}")
-        console.print("Expected: Dataset/Train/{Real,Fake} and Dataset/Validation/{Real,Fake}")
+        console.print(
+            "Expected: Dataset/Train/{Real,Fake} and Dataset/Validation/{Real,Fake}",
+        )
         raise SystemExit(1)
 
     # Data loaders
     train_dl, val_dl = get_loaders(DATA_ROOT, IMG_SIZE, BATCH_SIZE)
     console.print(
         f"[bold]Data[/]: train={len(train_dl.dataset)} | val={len(val_dl.dataset)} | "
-        f"bs={BATCH_SIZE} | steps/epoch={len(train_dl)}"
+        f"bs={BATCH_SIZE} | steps/epoch={len(train_dl)}",
     )
 
     # Model: EfficientNet-B3 (ImageNet-pretrained), 2-class head.
     model = EfficientNet.from_pretrained("efficientnet-b3")
-    in_features = model._fc.in_features  # type: ignore[attr-defined]
-    model._fc = nn.Linear(in_features, 2)  # type: ignore[attr-defined]
-    # Optional: bump dropout a bit; EfficientNet already uses dropout internally.
-    # model._dropout = nn.Dropout(p=0.5)  # uncomment if you want extra regularization
+    in_features = model._fc.in_features  # noqa: SLF001
+    model._fc = nn.Linear(in_features, 2)  # noqa: SLF001
+    # EfficientNet already uses dropout internally.
 
     model.to(memory_format=torch.channels_last)
     model = model.to(device)
@@ -305,7 +328,11 @@ def main() -> None:
         head_params = [p for p in model.parameters() if p.requires_grad]
         opt = optim.AdamW(head_params, lr=HEAD_LR, weight_decay=HEAD_WD)
 
-        warm_task = progress.add_task("warmup (head only)", total=len(train_dl), extra="")
+        warm_task = progress.add_task(
+            "warmup (head only)",
+            total=len(train_dl),
+            extra="",
+        )
         console.print("[bold]Warmup (head only)[/]")
         _ = train_one_epoch(
             model=model,
@@ -324,7 +351,7 @@ def main() -> None:
         res = evaluate(model, val_dl, device, criterion)
         console.print(
             f"[bold cyan]warmup[/] | val_acc={res.acc:.4f} | val_loss={res.loss:.4f} "
-            f"({res.correct}/{res.total})"
+            f"({res.correct}/{res.total})",
         )
         best_val_acc = res.acc
         best_epoch = 0
@@ -337,7 +364,7 @@ def main() -> None:
         # Smaller fine-tune micro-batch for laptop VRAM + gradient accumulation
         console.print(
             f"[bold]Fine-tune[/]: bs={FT_BATCH_SIZE}, accum_steps={ACCUM_STEPS} "
-            f"(effective ≈ {FT_BATCH_SIZE * ACCUM_STEPS})"
+            f"(effective ≈ {FT_BATCH_SIZE * ACCUM_STEPS})",
         )
         train_dl_ft = DataLoader(
             train_dl.dataset,
@@ -376,7 +403,7 @@ def main() -> None:
             console.print(
                 f"[bold cyan]epoch {epoch}[/] | train_loss={train_loss:.4f} "
                 f"| val_loss={res.loss:.4f} | val_acc={res.acc:.4f} "
-                f"({res.correct}/{res.total}) | lr={scheduler.get_last_lr()[0]:.2e}"
+                f"({res.correct}/{res.total}) | lr={scheduler.get_last_lr()[0]:.2e}",
             )
 
             improved = res.acc > best_val_acc + 1e-4
@@ -386,8 +413,8 @@ def main() -> None:
                 epochs_no_improve = 0
                 save_best(model, opt, scheduler, epoch)
                 console.print(
-                    f"[bold green]new best[/] val_acc={best_val_acc:.4f} (epoch {best_epoch}) "
-                    f"→ saved {BEST_WEIGHTS.name}"
+                    f"[bold green]new best[/] val_acc={best_val_acc:.4f} "
+                    f"(epoch {best_epoch}) → saved {BEST_WEIGHTS.name}",
                 )
             else:
                 epochs_no_improve += 1
@@ -395,7 +422,7 @@ def main() -> None:
                     console.print(
                         f"[bold yellow]Early stopping[/]: no improvement for "
                         f"{PATIENCE} epoch(s). Best at epoch {best_epoch} "
-                        f"with val_acc={best_val_acc:.4f}."
+                        f"with val_acc={best_val_acc:.4f}.",
                     )
                     break
 

@@ -1,6 +1,5 @@
-from __future__ import annotations
-"""
-Supervised training script for FasterViT-2-224 on a Real/Fake dataset.
+# ruff: noqa: INP001
+"""Supervised training script for FasterViT-2-224 on a Real/Fake dataset.
 
 Expected layout (ImageFolder-compatible):
     DATA_ROOT/
@@ -18,14 +17,14 @@ This script saves:
   checkpoints/fastervit_best.ckpt
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from pathlib import Path
 from time import perf_counter
-from typing import Tuple
 
 import torch
-import torch.nn as nn
-import torch.optim as optim
+from fastervit import create_model
 from rich.console import Console
 from rich.progress import (
     BarColumn,
@@ -36,17 +35,14 @@ from rich.progress import (
     TimeElapsedColumn,
     TimeRemainingColumn,
 )
+from torch import nn, optim
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
-
-from fastervit import create_model
 
 # ---------------------------- Config --------------------------------- #
 
 # Adjust for your environment if needed.
-DATA_ROOT: Path = (
-    Path.home() / "code" / "DeepfakeDetection" / "data" / "Dataset"
-)
+DATA_ROOT: Path = Path.home() / "code" / "DeepfakeDetection" / "data" / "Dataset"
 MODEL_NAME: str = "faster_vit_2_224"
 
 # Training hyperparameters.
@@ -76,14 +72,18 @@ console = Console()
 
 @dataclass(frozen=True)
 class EvalResult:
+    """Simple container for evaluation metrics."""
+
     acc: float
     total: int
     correct: int
 
 
 def get_loaders(
-    data_root: Path, img_size: int, batch_size: int
-) -> Tuple[DataLoader, DataLoader]:
+    data_root: Path,
+    img_size: int,
+    batch_size: int,
+) -> tuple[DataLoader, DataLoader]:
     """Build train/validation loaders. FasterViT expects ImageNet norm."""
     train_t = transforms.Compose(
         [
@@ -91,20 +91,16 @@ def get_loaders(
             transforms.RandomHorizontalFlip(),
             transforms.ColorJitter(0.1, 0.1, 0.1, 0.05),
             transforms.ToTensor(),
-            transforms.Normalize(
-                mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
-            ),
-        ]
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        ],
     )
     val_t = transforms.Compose(
         [
             transforms.Resize(256),
             transforms.CenterCrop(img_size),
             transforms.ToTensor(),
-            transforms.Normalize(
-                mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
-            ),
-        ]
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        ],
     )
 
     train_ds = datasets.ImageFolder(data_root / "Train", transform=train_t)
@@ -135,26 +131,27 @@ def evaluate(model: nn.Module, dl: DataLoader, device: str) -> EvalResult:
     correct = 0
     total = 0
     with torch.inference_mode():
-        for x, y in dl:
-            x = x.to(device, non_blocking=True).to(
-                memory_format=torch.channels_last
+        for batch_x, batch_y in dl:
+            inputs = batch_x.to(device, non_blocking=True).to(
+                memory_format=torch.channels_last,
             )
-            y = y.to(device, non_blocking=True)
-            logits = model(x)
+            targets = batch_y.to(device, non_blocking=True)
+            logits = model(inputs)
             pred = logits.argmax(1)
-            correct += (pred == y).sum().item()
-            total += y.numel()
+            correct += (pred == targets).sum().item()
+            total += targets.numel()
     acc = correct / max(1, total)
     return EvalResult(acc=acc, total=total, correct=correct)
 
 
-def train_one_epoch(
+def train_one_epoch(  # noqa: PLR0913
     model: nn.Module,
     dl: DataLoader,
     opt: optim.Optimizer,
     scaler: torch.amp.GradScaler,
     criterion: nn.Module,
     device: str,
+    *,
     use_cuda_amp: bool,
     progress: Progress,
     task: TaskID,
@@ -168,15 +165,15 @@ def train_one_epoch(
     # Track whether we have pending grads at the end (for non-divisible steps)
     pending_steps = 0
 
-    for i, (x, y) in enumerate(dl, 1):
-        x = x.to(device, non_blocking=True).to(
-            memory_format=torch.channels_last
+    for i, (batch_x, batch_y) in enumerate(dl, 1):
+        inputs = batch_x.to(device, non_blocking=True).to(
+            memory_format=torch.channels_last,
         )
-        y = y.to(device, non_blocking=True)
+        targets = batch_y.to(device, non_blocking=True)
 
         with torch.amp.autocast(device_type="cuda", enabled=use_cuda_amp):
-            logits = model(x)
-            loss = criterion(logits, y)
+            logits = model(inputs)
+            loss = criterion(logits, targets)
             if accum_steps > 1:
                 loss = loss / accum_steps
 
@@ -193,7 +190,7 @@ def train_one_epoch(
         elapsed = perf_counter() - start
         seen = min(i * dl.batch_size, len(dl.dataset))
         ips = seen / max(1e-6, elapsed)
-        shown_loss = float(loss.item() * (accum_steps if accum_steps > 1 else 1))
+        shown_loss = float(loss.item() * (max(1, accum_steps)))
         progress.update(
             task,
             advance=1,
@@ -212,7 +209,7 @@ def save_best(
     opt: optim.Optimizer,
     sched: optim.lr_scheduler._LRScheduler | None,
     epoch: int,
-) -> None:  # noqa: D401, SLF001
+) -> None:
     """Persist best weights and a full resume checkpoint."""
     torch.save(model.state_dict(), BEST_WEIGHTS)
     ckpt = {
@@ -224,7 +221,7 @@ def save_best(
     torch.save(ckpt, BEST_CKPT)
 
 
-def main() -> None:
+def main() -> None:  # noqa: PLR0915
     """Entrypoint: data, model, warmup, fine-tune, early stop, save best."""
     # Device
     torch.backends.cudnn.benchmark = True  # allows faster kernels on fixed shapes
@@ -240,14 +237,14 @@ def main() -> None:
     if not (DATA_ROOT / "Train").exists() or not (DATA_ROOT / "Validation").exists():
         console.print(f"[bold red]Dataset not found under[/] {DATA_ROOT}")
         console.print(
-            "Expected: Dataset/Train/{Real,Fake} and Dataset/Validation/{Real,Fake}"
+            "Expected: Dataset/Train/{Real,Fake} and Dataset/Validation/{Real,Fake}",
         )
         raise SystemExit(1)
 
     train_dl, val_dl = get_loaders(DATA_ROOT, IMG_SIZE, BATCH_SIZE)
     console.print(
         f"[bold]Data[/]: train={len(train_dl.dataset)} | val={len(val_dl.dataset)} | "
-        f"bs={BATCH_SIZE} | steps/epoch={len(train_dl)}"
+        f"bs={BATCH_SIZE} | steps/epoch={len(train_dl)}",
     )
 
     # Model: ImageNet-pretrained FasterViT, 2-class head.
@@ -288,7 +285,11 @@ def main() -> None:
         head_params = [p for p in model.parameters() if p.requires_grad]
         opt = optim.AdamW(head_params, lr=HEAD_LR, weight_decay=HEAD_WD)
 
-        warm_task = progress.add_task("warmup (head only)", total=len(train_dl), extra="")
+        warm_task = progress.add_task(
+            "warmup (head only)",
+            total=len(train_dl),
+            extra="",
+        )
         console.print("[bold]Warmup (head only)[/]")
         train_one_epoch(
             model=model,
@@ -306,8 +307,7 @@ def main() -> None:
         # Validate after warmup
         res = evaluate(model, val_dl, device)
         console.print(
-            f"[bold cyan]warmup[/] | val_acc={res.acc:.4f} "
-            f"({res.correct}/{res.total})"
+            f"[bold cyan]warmup[/] | val_acc={res.acc:.4f} ({res.correct}/{res.total})",
         )
         best_val_acc = res.acc
         best_epoch = 0
@@ -318,17 +318,17 @@ def main() -> None:
             p.requires_grad = True
 
         # Smaller fine-tune batch for laptop VRAM + gradient accumulation
-        FT_BATCH_SIZE = 32
-        EFFECTIVE_BATCH = 128
-        ACCUM_STEPS = max(1, EFFECTIVE_BATCH // FT_BATCH_SIZE)
+        ft_batch_size = 32
+        effective_batch = 128
+        accum_steps_ft = max(1, effective_batch // ft_batch_size)
         console.print(
-            f"[bold]Fine-tune[/]: bs={FT_BATCH_SIZE}, accum_steps={ACCUM_STEPS} "
-            f"(effective ≈ {FT_BATCH_SIZE * ACCUM_STEPS})"
+            f"[bold]Fine-tune[/]: bs={ft_batch_size}, accum_steps={accum_steps_ft} "
+            f"(effective ≈ {ft_batch_size * accum_steps_ft})",
         )
 
         train_dl = DataLoader(
             train_dl.dataset,
-            batch_size=FT_BATCH_SIZE,
+            batch_size=ft_batch_size,
             shuffle=True,
             num_workers=NUM_WORKERS,
             pin_memory=True,
@@ -341,14 +341,10 @@ def main() -> None:
             lr=FT_LR,
             weight_decay=FT_WD,
         )
-        scheduler = optim.lr_scheduler.CosineAnnealingLR(
-            opt, T_max=max(1, EPOCHS - 1)
-        )
+        scheduler = optim.lr_scheduler.CosineAnnealingLR(opt, T_max=max(1, EPOCHS - 1))
 
         for epoch in range(1, EPOCHS + 1):
-            task = progress.add_task(
-                f"epoch {epoch}", total=len(train_dl), extra=""
-            )
+            task = progress.add_task(f"epoch {epoch}", total=len(train_dl), extra="")
             train_one_epoch(
                 model=model,
                 dl=train_dl,
@@ -359,14 +355,14 @@ def main() -> None:
                 use_cuda_amp=use_cuda,
                 progress=progress,
                 task=task,
-                accum_steps=ACCUM_STEPS,
+                accum_steps=accum_steps_ft,
             )
             scheduler.step()
 
             res = evaluate(model, val_dl, device)
             console.print(
                 f"[bold cyan]epoch {epoch}[/] | val_acc={res.acc:.4f} "
-                f"({res.correct}/{res.total}) | lr={scheduler.get_last_lr()[0]:.2e}"
+                f"({res.correct}/{res.total}) | lr={scheduler.get_last_lr()[0]:.2e}",
             )
 
             improved = res.acc > best_val_acc + 1e-4
@@ -377,7 +373,7 @@ def main() -> None:
                 save_best(model, opt, scheduler, epoch)
                 console.print(
                     f"[bold green]↑ new best[/] val_acc={best_val_acc:.4f} "
-                    f"(epoch {best_epoch}) → saved {BEST_WEIGHTS.name}"
+                    f"(epoch {best_epoch}) → saved {BEST_WEIGHTS.name}",
                 )
             else:
                 epochs_no_improve += 1
@@ -385,7 +381,7 @@ def main() -> None:
                     console.print(
                         f"[bold yellow]Early stopping[/]: no improvement for "
                         f"{PATIENCE} epoch(s). Best at epoch {best_epoch} "
-                        f"with val_acc={best_val_acc:.4f}."
+                        f"with val_acc={best_val_acc:.4f}.",
                     )
                     break
 
