@@ -1,20 +1,29 @@
+"""Web UI for Real vs Fake face detection with Grad-CAM visualization.
+
+This script loads three trained models (EfficientNet-B3, FasterViT-2-224,
+EfficientFormerV2-S1), performs inference on an input image, produces
+Grad-CAM overlays for each model, and displays the results side-by-side
+via a Gradio interface. It also exports a high-resolution composite image
+to disk.
+"""
+
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 import gradio as gr
 import numpy as np
 import timm
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
+import torch.nn.functional as f
 from efficientnet_pytorch import EfficientNet
 from fastervit import create_model
 from PIL import Image, ImageDraw, ImageFont
 from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.image import show_cam_on_image
 from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
+from torch import nn
 from torchvision import transforms
 
 # ---------------------------------------------------------------------
@@ -29,10 +38,8 @@ EFV2_WEIGHTS = WEIGHTS_DIR / "EfficientFormerV2_S1.pth"
 
 for p in (EN_WEIGHTS, FV_WEIGHTS, EFV2_WEIGHTS):
     if not p.exists():
-        raise FileNotFoundError(
-            f"Missing weights: {p}. Expected under {WEIGHTS_DIR.resolve()}."
-        )
-
+        msg = f"Missing weights: {p}. Expected under {WEIGHTS_DIR.resolve()}."
+        raise FileNotFoundError(msg)
 
 EXPORT_SCALE = 2
 EXPORT_DIR = Path("outputs") / "cam_exports"
@@ -53,7 +60,7 @@ TRANSFORM_IMAGENET = transforms.Compose(
             mean=[0.485, 0.456, 0.406],
             std=[0.229, 0.224, 0.225],
         ),
-    ]
+    ],
 )
 
 # Project policy for EfficientFormerV2-S1 (no normalization).
@@ -62,17 +69,20 @@ TRANSFORM_NO_NORM = transforms.Compose(
         transforms.Resize(256),
         transforms.CenterCrop(224),
         transforms.ToTensor(),
-    ]
+    ],
 )
 
 
 def _prepare_for_cam(
-    image: Image.Image, img_size: int, normalize: bool
+    image: Image.Image,
+    img_size: int,
+    *,
+    normalize: bool,
 ) -> tuple[torch.Tensor, np.ndarray]:
     """Return (input_tensor, rgb_float) with aligned spatial transforms."""
     t = TRANSFORM_IMAGENET if normalize else TRANSFORM_NO_NORM
     pil_rc = transforms.Compose(
-        [transforms.Resize(img_size), transforms.CenterCrop(img_size)]
+        [transforms.Resize(img_size), transforms.CenterCrop(img_size)],
     )
     pil_img = pil_rc(image.convert("RGB"))
     rgb = np.asarray(pil_img, dtype=np.float32) / 255.0  # HWC in [0,1]
@@ -87,7 +97,8 @@ def _find_last_conv_layer(module: nn.Module) -> nn.Module:
         if isinstance(m, nn.Conv2d):
             last = m
     if last is None:
-        raise RuntimeError("No Conv2d layer found for Grad-CAM target.")
+        msg = "No Conv2d layer found for Grad-CAM target."
+        raise RuntimeError(msg)
     return last
 
 
@@ -112,8 +123,8 @@ def _add_label(img_rgb_uint8: np.ndarray, text: str) -> np.ndarray:
 # ---------------------------------------------------------------------
 # EfficientNet-B3
 efficientnet_model = EfficientNet.from_pretrained("efficientnet-b3")
-_en_in = efficientnet_model._fc.in_features
-efficientnet_model._fc = nn.Linear(_en_in, 2)
+_en_in = efficientnet_model._fc.in_features  # noqa: SLF001
+efficientnet_model._fc = nn.Linear(_en_in, 2)  # noqa: SLF001
 efficientnet_model.load_state_dict(torch.load(EN_WEIGHTS, map_location="cpu"))
 efficientnet_model.to(DEVICE).eval()
 
@@ -126,7 +137,9 @@ faster_vit_model.to(DEVICE).eval()
 
 # EfficientFormerV2-S1 via timm
 efficientformer_model: nn.Module = timm.create_model(
-    "efficientformerv2_s1", pretrained=False, num_classes=2
+    "efficientformerv2_s1",
+    pretrained=False,
+    num_classes=2,
 )
 efficientformer_model.load_state_dict(
     torch.load(EFV2_WEIGHTS, map_location="cpu"),
@@ -139,11 +152,16 @@ efficientformer_model.to(DEVICE).eval()
 # Inference + Grad-CAM (show CAM from each model side by side)
 # ---------------------------------------------------------------------
 def predict_and_visualize(image: Image.Image) -> tuple[np.ndarray, str]:
+    """Run inference with three models and visualize Grad-CAM panels side-by-side.
+
+    Returns a high-resolution concatenated image (as a NumPy array) and a
+    summary string with predicted labels and confidences for each model.
+    """
     # EfficientNet prediction
     with torch.inference_mode():
         x_en = TRANSFORM_IMAGENET(image).unsqueeze(0).to(DEVICE)
         logits_en = efficientnet_model(x_en)
-        probs_en = F.softmax(logits_en, dim=1)
+        probs_en = f.softmax(logits_en, dim=1)
         cls_en = int(probs_en.argmax(1))
         conf_en = float(probs_en[0, cls_en] * 100.0)
         label_en = CLASS_LABELS.get(cls_en, f"class_{cls_en}")
@@ -152,7 +170,7 @@ def predict_and_visualize(image: Image.Image) -> tuple[np.ndarray, str]:
     with torch.inference_mode():
         x_fv = TRANSFORM_IMAGENET(image).unsqueeze(0).to(DEVICE)
         logits_fv = faster_vit_model(x_fv)
-        probs_fv = F.softmax(logits_fv, dim=1)
+        probs_fv = f.softmax(logits_fv, dim=1)
         cls_fv = int(probs_fv.argmax(1))
         conf_fv = float(probs_fv[0, cls_fv] * 100.0)
         label_fv = CLASS_LABELS.get(cls_fv, f"class_{cls_fv}")
@@ -160,7 +178,7 @@ def predict_and_visualize(image: Image.Image) -> tuple[np.ndarray, str]:
     # EfficientFormerV2-S1 prediction
     with torch.inference_mode():
         x_ef = TRANSFORM_NO_NORM(image).unsqueeze(0).to(DEVICE)
-        probs_ef = F.softmax(efficientformer_model(x_ef), dim=1)
+        probs_ef = f.softmax(efficientformer_model(x_ef), dim=1)
         cls_ef = int(probs_ef.argmax(1))
         conf_ef = float(probs_ef[0, cls_ef] * 100.0)
         label_ef = CLASS_LABELS.get(cls_ef, f"class_{cls_ef}")
@@ -168,10 +186,11 @@ def predict_and_visualize(image: Image.Image) -> tuple[np.ndarray, str]:
     # Grad-CAM: one overlay per model
     # EfficientNet CAM
     x_cam_en, rgb_en = _prepare_for_cam(image, img_size=224, normalize=True)
-    target_layer_en = efficientnet_model._conv_head
+    target_layer_en = efficientnet_model._conv_head  # noqa: SLF001
     with GradCAM(model=efficientnet_model, target_layers=[target_layer_en]) as cam_en:
         gray_en = cam_en(
-            input_tensor=x_cam_en, targets=[ClassifierOutputTarget(cls_en)]
+            input_tensor=x_cam_en,
+            targets=[ClassifierOutputTarget(cls_en)],
         )[0]
     overlay_en = show_cam_on_image(rgb_en, gray_en, use_rgb=True)
     panel_en = _add_label(overlay_en, f"EfficientNet-B3 {label_en} ({conf_en:.1f}%)")
@@ -181,7 +200,8 @@ def predict_and_visualize(image: Image.Image) -> tuple[np.ndarray, str]:
     target_layer_fv = _find_last_conv_layer(faster_vit_model)
     with GradCAM(model=faster_vit_model, target_layers=[target_layer_fv]) as cam_fv:
         gray_fv = cam_fv(
-            input_tensor=x_cam_fv, targets=[ClassifierOutputTarget(cls_fv)]
+            input_tensor=x_cam_fv,
+            targets=[ClassifierOutputTarget(cls_fv)],
         )[0]
     overlay_fv = show_cam_on_image(rgb_fv, gray_fv, use_rgb=True)
     panel_fv = _add_label(overlay_fv, f"FasterViT {label_fv} ({conf_fv:.1f}%)")
@@ -190,14 +210,17 @@ def predict_and_visualize(image: Image.Image) -> tuple[np.ndarray, str]:
     x_cam_ef, rgb_ef = _prepare_for_cam(image, img_size=224, normalize=False)
     target_layer_ef = _find_last_conv_layer(efficientformer_model)
     with GradCAM(
-        model=efficientformer_model, target_layers=[target_layer_ef]
+        model=efficientformer_model,
+        target_layers=[target_layer_ef],
     ) as cam_ef:
         gray_ef = cam_ef(
-            input_tensor=x_cam_ef, targets=[ClassifierOutputTarget(cls_ef)]
+            input_tensor=x_cam_ef,
+            targets=[ClassifierOutputTarget(cls_ef)],
         )[0]
     overlay_ef = show_cam_on_image(rgb_ef, gray_ef, use_rgb=True)
     panel_ef = _add_label(
-        overlay_ef, f"EfficientFormerV2-S1 {label_ef} ({conf_ef:.1f}%)"
+        overlay_ef,
+        f"EfficientFormerV2-S1 {label_ef} ({conf_ef:.1f}%)",
     )
 
     # Concatenate panels horizontally
@@ -206,10 +229,12 @@ def predict_and_visualize(image: Image.Image) -> tuple[np.ndarray, str]:
     # Export high-res image
     h, w, _ = side_by_side.shape
     export_img = Image.fromarray(side_by_side).resize(
-        (w * EXPORT_SCALE, h * EXPORT_SCALE), resample=Image.BICUBIC
+        (w * EXPORT_SCALE, h * EXPORT_SCALE),
+        resample=Image.BICUBIC,
     )
     out_path = (
-        EXPORT_DIR / f"cam_triptych_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+        EXPORT_DIR
+        / f"cam_triptych_{datetime.now(tz=UTC).strftime('%Y%m%d_%H%M%S')}.png"
     )
     export_img.save(out_path, format="PNG", optimize=True)
 

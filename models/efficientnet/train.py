@@ -1,5 +1,5 @@
 # ruff: noqa: INP001
-"""Supervised training script for FasterViT-2-224 on a Real/Fake dataset.
+"""Supervised training script for EfficientNet-B3 on a Real/Fake dataset.
 
 Expected layout (ImageFolder-compatible):
     DATA_ROOT/
@@ -12,9 +12,9 @@ Training regime:
 - Uses AMP on CUDA (if available) and channels_last for throughput.
 
 This script saves:
-- Best weights (by Validation accuracy): FasterVitModel.pth
+- Best weights (by Validation accuracy): EfficientNetModel.pth
 - A full training checkpoint (model+optimizer+scheduler+epoch) for resume:
-  checkpoints/fastervit_best.ckpt
+  checkpoints/efficientnet_best.ckpt
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ from pathlib import Path
 from time import perf_counter
 
 import torch
-from fastervit import create_model
+from efficientnet_pytorch import EfficientNet
 from rich.console import Console
 from rich.progress import (
     BarColumn,
@@ -43,7 +43,6 @@ from torchvision import datasets, transforms
 
 # Adjust for your environment if needed.
 DATA_ROOT: Path = Path.home() / "code" / "DeepfakeDetection" / "data" / "Dataset"
-MODEL_NAME: str = "faster_vit_2_224"
 
 # Training hyperparameters.
 EPOCHS: int = 25
@@ -61,9 +60,14 @@ FT_WD: float = 5e-2
 PATIENCE: int = 4  # epochs without improvement
 
 # Output paths.
-BEST_WEIGHTS: Path = Path("FasterVitModel.pth")
-BEST_CKPT: Path = Path("checkpoints") / "fastervit_best.ckpt"
+BEST_WEIGHTS: Path = Path("EfficientNetModel.pth")
+BEST_CKPT: Path = Path("checkpoints") / "efficientnet_best.ckpt"
 BEST_CKPT.parent.mkdir(parents=True, exist_ok=True)
+
+# Optional: gradient accumulation (helps laptops with limited VRAM)
+FT_BATCH_SIZE: int = 32  # micro-batch size during fine-tune
+EFFECTIVE_BATCH: int = 128  # desired effective batch
+ACCUM_STEPS: int = max(1, EFFECTIVE_BATCH // FT_BATCH_SIZE)
 
 # --------------------------------------------------------------------- #
 
@@ -72,9 +76,10 @@ console = Console()
 
 @dataclass(frozen=True)
 class EvalResult:
-    """Simple container for evaluation metrics."""
+    """Container for evaluation metrics."""
 
     acc: float
+    loss: float
     total: int
     correct: int
 
@@ -84,14 +89,24 @@ def get_loaders(
     img_size: int,
     batch_size: int,
 ) -> tuple[DataLoader, DataLoader]:
-    """Build train/validation loaders. FasterViT expects ImageNet norm."""
+    """Build train/validation loaders. EfficientNet expects ImageNet norm."""
     train_t = transforms.Compose(
         [
             transforms.RandomResizedCrop(img_size, scale=(0.9, 1.0)),
             transforms.RandomHorizontalFlip(),
-            transforms.ColorJitter(0.1, 0.1, 0.1, 0.05),
+            transforms.RandomRotation(10),
+            transforms.ColorJitter(0.2, 0.2, 0.2, 0.05),
             transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            transforms.Normalize(
+                mean=[0.485, 0.456, 0.406],
+                std=[0.229, 0.224, 0.225],
+            ),
+            transforms.RandomErasing(
+                p=0.5,
+                scale=(0.02, 0.33),
+                ratio=(0.3, 3.3),
+                value=0,
+            ),
         ],
     )
     val_t = transforms.Compose(
@@ -99,7 +114,10 @@ def get_loaders(
             transforms.Resize(256),
             transforms.CenterCrop(img_size),
             transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            transforms.Normalize(
+                mean=[0.485, 0.456, 0.406],
+                std=[0.229, 0.224, 0.225],
+            ),
         ],
     )
 
@@ -113,6 +131,7 @@ def get_loaders(
         num_workers=NUM_WORKERS,
         pin_memory=True,
         persistent_workers=NUM_WORKERS > 0,
+        prefetch_factor=2,
     )
     val_dl = DataLoader(
         val_ds,
@@ -121,15 +140,22 @@ def get_loaders(
         num_workers=NUM_WORKERS,
         pin_memory=True,
         persistent_workers=NUM_WORKERS > 0,
+        prefetch_factor=2,
     )
     return train_dl, val_dl
 
 
-def evaluate(model: nn.Module, dl: DataLoader, device: str) -> EvalResult:
-    """Compute top-1 accuracy."""
+def evaluate(
+    model: nn.Module,
+    dl: DataLoader,
+    device: str,
+    criterion: nn.Module,
+) -> EvalResult:
+    """Compute top-1 accuracy and mean loss."""
     model.eval()
     correct = 0
     total = 0
+    loss_sum = 0.0
     with torch.inference_mode():
         for batch_x, batch_y in dl:
             inputs = batch_x.to(device, non_blocking=True).to(
@@ -137,11 +163,14 @@ def evaluate(model: nn.Module, dl: DataLoader, device: str) -> EvalResult:
             )
             targets = batch_y.to(device, non_blocking=True)
             logits = model(inputs)
+            loss = criterion(logits, targets)
             pred = logits.argmax(1)
             correct += (pred == targets).sum().item()
             total += targets.numel()
+            loss_sum += float(loss.item()) * targets.size(0)
     acc = correct / max(1, total)
-    return EvalResult(acc=acc, total=total, correct=correct)
+    mean_loss = loss_sum / max(1, total)
+    return EvalResult(acc=acc, loss=mean_loss, total=total, correct=correct)
 
 
 def train_one_epoch(  # noqa: PLR0913
@@ -156,13 +185,17 @@ def train_one_epoch(  # noqa: PLR0913
     progress: Progress,
     task: TaskID,
     accum_steps: int = 1,
-) -> None:
-    """Single-epoch training loop with AMP and live throughput reporting."""
+) -> float:
+    """Single-epoch training loop with AMP, accumulation, and live throughput reporting.
+
+    Returns mean train loss.
+    """
     model.train()
     start = perf_counter()
     opt.zero_grad(set_to_none=True)
 
-    # Track whether we have pending grads at the end (for non-divisible steps)
+    loss_sum = 0.0
+    seen_total = 0
     pending_steps = 0
 
     for i, (batch_x, batch_y) in enumerate(dl, 1):
@@ -186,7 +219,12 @@ def train_one_epoch(  # noqa: PLR0913
             opt.zero_grad(set_to_none=True)
             pending_steps = 0
 
-        # Progress bar: show loss (unscaled) and images/sec
+        # Stats
+        bsz = targets.size(0)
+        seen_total += bsz
+        loss_sum += float(loss.item()) * bsz * (max(1, accum_steps))
+
+        # Progress bar: show unscaled loss and images/sec
         elapsed = perf_counter() - start
         seen = min(i * dl.batch_size, len(dl.dataset))
         ips = seen / max(1e-6, elapsed)
@@ -197,11 +235,13 @@ def train_one_epoch(  # noqa: PLR0913
             description=f"train | loss={shown_loss:.4f} | {ips:.0f} img/s",
         )
 
-    # Flush any leftover grads if the last micro-batch didn't hit a step
+    # Flush any leftover grads
     if pending_steps > 0:
         scaler.step(opt)
         scaler.update()
         opt.zero_grad(set_to_none=True)
+
+    return loss_sum / max(1, seen_total)
 
 
 def save_best(
@@ -224,7 +264,7 @@ def save_best(
 def main() -> None:  # noqa: PLR0915
     """Entrypoint: data, model, warmup, fine-tune, early stop, save best."""
     # Device
-    torch.backends.cudnn.benchmark = True  # allows faster kernels on fixed shapes
+    torch.backends.cudnn.benchmark = True  # faster kernels on stable shapes
     use_cuda = torch.cuda.is_available()
     device = "cuda" if use_cuda else "cpu"
     if use_cuda:
@@ -241,20 +281,23 @@ def main() -> None:  # noqa: PLR0915
         )
         raise SystemExit(1)
 
+    # Data loaders
     train_dl, val_dl = get_loaders(DATA_ROOT, IMG_SIZE, BATCH_SIZE)
     console.print(
         f"[bold]Data[/]: train={len(train_dl.dataset)} | val={len(val_dl.dataset)} | "
         f"bs={BATCH_SIZE} | steps/epoch={len(train_dl)}",
     )
 
-    # Model: ImageNet-pretrained FasterViT, 2-class head.
-    model = create_model(MODEL_NAME, pretrained=True)
-    in_features = model.head.in_features  # type: ignore[attr-defined]
-    model.head = nn.Linear(in_features, 2)  # type: ignore[attr-defined]
+    # Model: EfficientNet-B3 (ImageNet-pretrained), 2-class head.
+    model = EfficientNet.from_pretrained("efficientnet-b3")
+    in_features = model._fc.in_features  # noqa: SLF001
+    model._fc = nn.Linear(in_features, 2)  # noqa: SLF001
+    # EfficientNet already uses dropout internally.
+
     model.to(memory_format=torch.channels_last)
     model = model.to(device)
 
-    # Criterion shared across phases.
+    # Loss, scaler
     criterion: nn.Module = nn.CrossEntropyLoss(label_smoothing=0.1)
     scaler = torch.amp.GradScaler(enabled=use_cuda)
 
@@ -279,7 +322,7 @@ def main() -> None:  # noqa: PLR0915
         for p in model.parameters():
             p.requires_grad = False
         for n, p in model.named_parameters():
-            if "head" in n:
+            if "_fc" in n:
                 p.requires_grad = True
 
         head_params = [p for p in model.parameters() if p.requires_grad]
@@ -291,7 +334,7 @@ def main() -> None:  # noqa: PLR0915
             extra="",
         )
         console.print("[bold]Warmup (head only)[/]")
-        train_one_epoch(
+        _ = train_one_epoch(
             model=model,
             dl=train_dl,
             opt=opt,
@@ -305,9 +348,10 @@ def main() -> None:  # noqa: PLR0915
         )
 
         # Validate after warmup
-        res = evaluate(model, val_dl, device)
+        res = evaluate(model, val_dl, device, criterion)
         console.print(
-            f"[bold cyan]warmup[/] | val_acc={res.acc:.4f} ({res.correct}/{res.total})",
+            f"[bold cyan]warmup[/] | val_acc={res.acc:.4f} | val_loss={res.loss:.4f} "
+            f"({res.correct}/{res.total})",
         )
         best_val_acc = res.acc
         best_epoch = 0
@@ -317,18 +361,14 @@ def main() -> None:  # noqa: PLR0915
         for p in model.parameters():
             p.requires_grad = True
 
-        # Smaller fine-tune batch for laptop VRAM + gradient accumulation
-        ft_batch_size = 32
-        effective_batch = 128
-        accum_steps_ft = max(1, effective_batch // ft_batch_size)
+        # Smaller fine-tune micro-batch for laptop VRAM + gradient accumulation
         console.print(
-            f"[bold]Fine-tune[/]: bs={ft_batch_size}, accum_steps={accum_steps_ft} "
-            f"(effective ≈ {ft_batch_size * accum_steps_ft})",
+            f"[bold]Fine-tune[/]: bs={FT_BATCH_SIZE}, accum_steps={ACCUM_STEPS} "
+            f"(effective ≈ {FT_BATCH_SIZE * ACCUM_STEPS})",
         )
-
-        train_dl = DataLoader(
+        train_dl_ft = DataLoader(
             train_dl.dataset,
-            batch_size=ft_batch_size,
+            batch_size=FT_BATCH_SIZE,
             shuffle=True,
             num_workers=NUM_WORKERS,
             pin_memory=True,
@@ -344,10 +384,10 @@ def main() -> None:  # noqa: PLR0915
         scheduler = optim.lr_scheduler.CosineAnnealingLR(opt, T_max=max(1, EPOCHS - 1))
 
         for epoch in range(1, EPOCHS + 1):
-            task = progress.add_task(f"epoch {epoch}", total=len(train_dl), extra="")
-            train_one_epoch(
+            task = progress.add_task(f"epoch {epoch}", total=len(train_dl_ft), extra="")
+            train_loss = train_one_epoch(
                 model=model,
-                dl=train_dl,
+                dl=train_dl_ft,
                 opt=opt,
                 scaler=scaler,
                 criterion=criterion,
@@ -355,13 +395,14 @@ def main() -> None:  # noqa: PLR0915
                 use_cuda_amp=use_cuda,
                 progress=progress,
                 task=task,
-                accum_steps=accum_steps_ft,
+                accum_steps=ACCUM_STEPS,
             )
             scheduler.step()
 
-            res = evaluate(model, val_dl, device)
+            res = evaluate(model, val_dl, device, criterion)
             console.print(
-                f"[bold cyan]epoch {epoch}[/] | val_acc={res.acc:.4f} "
+                f"[bold cyan]epoch {epoch}[/] | train_loss={train_loss:.4f} "
+                f"| val_loss={res.loss:.4f} | val_acc={res.acc:.4f} "
                 f"({res.correct}/{res.total}) | lr={scheduler.get_last_lr()[0]:.2e}",
             )
 
@@ -372,7 +413,7 @@ def main() -> None:  # noqa: PLR0915
                 epochs_no_improve = 0
                 save_best(model, opt, scheduler, epoch)
                 console.print(
-                    f"[bold green]↑ new best[/] val_acc={best_val_acc:.4f} "
+                    f"[bold green]new best[/] val_acc={best_val_acc:.4f} "
                     f"(epoch {best_epoch}) → saved {BEST_WEIGHTS.name}",
                 )
             else:
