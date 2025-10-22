@@ -1,0 +1,26 @@
+mode: training
+seed: 1337
+device: cuda
+
+data:
+  root: data/DeepFakeFrames
+  train_split: train
+  val_split: val
+  test_split: test
+  num_classes: 2
+  img_size: 224
+
+models:
+  - name: efficientnet_b3
+    enabled: true
+    output_dir: runs/efficientnet_b3
+    training:
+      epochs: 10
+      batch_size: 64
+      num_workers: 4
+      resume: auto
+    inference:
+      weights: weights/EfficientNet_10_21_2025.pth
+      split: test
+      batch_size: 256
+      num_workers: 2

@@ -66,3 +66,29 @@ To set up the project, follow these steps:
    Install with:
    ```bash
    pip install -r requirements.txt
+```
+
+## Orchestrating runs (training & inference)
+
+The new `orchestrator.py` script provides a thin automation layer for
+deepfake frame classification experiments. It reads the YAML file at
+`config/run.yaml`, spins up per-model run directories under
+`runs/{model}/{timestamp}/`, and wires environment variables so the
+existing training scripts can resume, pick seeds, and respect custom
+dataset splits.
+
+1. **Train models listed in the config** (ensure `mode: training`):
+   ```bash
+   python orchestrator.py --config config/run.yaml
+   ```
+2. **Evaluate models headlessly** (toggle `mode: inference` in the same
+   config to reuse the dataset/weights settings):
+   ```bash
+   python orchestrator.py --config config/run.yaml
+   ```
+
+Each run directory contains `checkpoints/` (latest & best checkpoints),
+`logs/` (console output plus JSONL metrics), and `plots/` (confusion
+matrix and ROC curve when labels are available). The setup targets
+frame-level deepfake vs. real classification but works for multiclass
+ImageFolder datasets as well (e.g., MNIST variants converted to RGB).
