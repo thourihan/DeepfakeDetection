@@ -39,6 +39,17 @@ from torch import nn, optim
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
+from train_env import (
+    apply_seed,
+    env_int,
+    env_path,
+    env_str,
+    maybe_load_checkpoint,
+    prepare_training_environment,
+    save_best_checkpoint,
+    save_latest_checkpoint,
+)
+
 # ---------------------------- Config --------------------------------- #
 
 # Adjust for your environment if needed.
@@ -60,10 +71,10 @@ FT_WD: float = 5e-2
 # Early stopping by Validation accuracy.
 PATIENCE: int = 4  # epochs without improvement
 
-# Output paths.
-BEST_WEIGHTS: Path = Path("FasterVitModel.pth")
-BEST_CKPT: Path = Path("checkpoints") / "fastervit_best.ckpt"
-BEST_CKPT.parent.mkdir(parents=True, exist_ok=True)
+# Output filenames (paths resolved at runtime via :mod:`train_env`).
+BEST_WEIGHTS_NAME: str = "FasterVitModel.pth"
+BEST_CKPT_NAME: str = "best.ckpt"
+LATEST_CKPT_NAME: str = "latest.ckpt"
 
 # --------------------------------------------------------------------- #
 
@@ -81,8 +92,11 @@ class EvalResult:
 
 def get_loaders(
     data_root: Path,
+    train_split: str,
+    val_split: str,
     img_size: int,
     batch_size: int,
+    num_workers: int,
 ) -> tuple[DataLoader, DataLoader]:
     """Build train/validation loaders. FasterViT expects ImageNet norm."""
     train_t = transforms.Compose(
@@ -103,24 +117,24 @@ def get_loaders(
         ],
     )
 
-    train_ds = datasets.ImageFolder(data_root / "Train", transform=train_t)
-    val_ds = datasets.ImageFolder(data_root / "Validation", transform=val_t)
+    train_ds = datasets.ImageFolder(data_root / train_split, transform=train_t)
+    val_ds = datasets.ImageFolder(data_root / val_split, transform=val_t)
 
     train_dl = DataLoader(
         train_ds,
         batch_size=batch_size,
         shuffle=True,
-        num_workers=NUM_WORKERS,
+        num_workers=num_workers,
         pin_memory=True,
-        persistent_workers=NUM_WORKERS > 0,
+        persistent_workers=num_workers > 0,
     )
     val_dl = DataLoader(
         val_ds,
         batch_size=batch_size,
         shuffle=False,
-        num_workers=NUM_WORKERS,
+        num_workers=num_workers,
         pin_memory=True,
-        persistent_workers=NUM_WORKERS > 0,
+        persistent_workers=num_workers > 0,
     )
     return train_dl, val_dl
 
@@ -204,61 +218,68 @@ def train_one_epoch(  # noqa: PLR0913
         opt.zero_grad(set_to_none=True)
 
 
-def save_best(
-    model: nn.Module,
-    opt: optim.Optimizer,
-    sched: optim.lr_scheduler._LRScheduler | None,
-    epoch: int,
-) -> None:
-    """Persist best weights and a full resume checkpoint."""
-    torch.save(model.state_dict(), BEST_WEIGHTS)
-    ckpt = {
-        "epoch": epoch,
-        "model": model.state_dict(),
-        "optimizer": opt.state_dict(),
-        "scheduler": sched.state_dict() if sched is not None else None,
-    }
-    torch.save(ckpt, BEST_CKPT)
-
-
 def main() -> None:  # noqa: PLR0915
     """Entrypoint: data, model, warmup, fine-tune, early stop, save best."""
-    # Device
-    torch.backends.cudnn.benchmark = True  # allows faster kernels on fixed shapes
+    env = prepare_training_environment(
+        weights_name=BEST_WEIGHTS_NAME,
+        best_checkpoint_name=BEST_CKPT_NAME,
+        latest_checkpoint_name=LATEST_CKPT_NAME,
+    )
+    apply_seed(env.seed)
+
+    data_root = env_path("DD_DATA_ROOT", DATA_ROOT)
+    train_split = env_str("DD_TRAIN_SPLIT", "Train")
+    val_split = env_str("DD_VAL_SPLIT", "Validation")
+    batch_size = env_int("DD_BATCH_SIZE", BATCH_SIZE)
+    epochs = env_int("DD_EPOCHS", EPOCHS)
+    img_size = env_int("DD_IMG_SIZE", IMG_SIZE)
+    num_workers = env_int("DD_NUM_WORKERS", NUM_WORKERS)
+    num_classes = env_int("DD_NUM_CLASSES", 2)
+
     use_cuda = torch.cuda.is_available()
     device = "cuda" if use_cuda else "cpu"
-    if use_cuda:
-        console.print("[bold green]✅ CUDA available[/]: using GPU")
-        console.print(f"Device: {torch.cuda.get_device_name(0)}")
-    else:
-        console.print("[bold yellow]⚠️  CUDA not available[/]: using CPU")
+    if env.device_override:
+        requested = env.device_override
+        if requested.startswith("cuda") and not torch.cuda.is_available():
+            console.print(
+                "[bold yellow]⚠️  Requested CUDA device not available[/]; falling back to CPU",
+            )
+            device = "cpu"
+            use_cuda = False
+        else:
+            device = requested
+            use_cuda = requested.startswith("cuda")
+    torch.backends.cudnn.benchmark = use_cuda and env.seed is None
 
-    # Dataset presence check.
-    if not (DATA_ROOT / "Train").exists() or not (DATA_ROOT / "Validation").exists():
-        console.print(f"[bold red]Dataset not found under[/] {DATA_ROOT}")
+    if not (data_root / train_split).exists() or not (data_root / val_split).exists():
+        console.print(f"[bold red]Dataset not found under[/] {data_root}")
         console.print(
-            "Expected: Dataset/Train/{Real,Fake} and Dataset/Validation/{Real,Fake}",
+            f"Expected: {data_root}/{train_split}/<class> and {data_root}/{val_split}/<class>",
         )
         raise SystemExit(1)
 
-    train_dl, val_dl = get_loaders(DATA_ROOT, IMG_SIZE, BATCH_SIZE)
+    train_dl, val_dl = get_loaders(
+        data_root,
+        train_split,
+        val_split,
+        img_size,
+        batch_size,
+        num_workers,
+    )
     console.print(
         f"[bold]Data[/]: train={len(train_dl.dataset)} | val={len(val_dl.dataset)} | "
-        f"bs={BATCH_SIZE} | steps/epoch={len(train_dl)}",
+        f"bs={batch_size} | steps/epoch={len(train_dl)}",
     )
 
-    # Model: ImageNet-pretrained FasterViT, 2-class head.
     model = create_model(MODEL_NAME, pretrained=True)
     in_features = model.head.in_features  # type: ignore[attr-defined]
-    model.head = nn.Linear(in_features, 2)  # type: ignore[attr-defined]
+    model.head = nn.Linear(in_features, num_classes)  # type: ignore[attr-defined]
     model.to(memory_format=torch.channels_last)
     model = model.to(device)
 
-    # Criterion shared across phases.
     criterion: nn.Module = nn.CrossEntropyLoss(label_smoothing=0.1)
     scaler = torch.amp.GradScaler(enabled=use_cuda)
 
-    # Progress UI.
     progress = Progress(
         TextColumn("[bold blue]{task.description}"),
         BarColumn(bar_width=None),
@@ -273,51 +294,49 @@ def main() -> None:  # noqa: PLR0915
     best_val_acc = -1.0
     best_epoch = -1
     epochs_no_improve = 0
+    warmup_done = env.resume_checkpoint is not None
 
     with progress:
-        # ---------------------- Phase 1: head warmup ---------------------- #
-        for p in model.parameters():
-            p.requires_grad = False
-        for n, p in model.named_parameters():
-            if "head" in n:
-                p.requires_grad = True
+        if not warmup_done:
+            for param in model.parameters():
+                param.requires_grad = False
+            for name, param in model.named_parameters():
+                if "head" in name:
+                    param.requires_grad = True
 
-        head_params = [p for p in model.parameters() if p.requires_grad]
-        opt = optim.AdamW(head_params, lr=HEAD_LR, weight_decay=HEAD_WD)
+            head_params = [p for p in model.parameters() if p.requires_grad]
+            warm_opt = optim.AdamW(head_params, lr=HEAD_LR, weight_decay=HEAD_WD)
 
-        warm_task = progress.add_task(
-            "warmup (head only)",
-            total=len(train_dl),
-            extra="",
-        )
-        console.print("[bold]Warmup (head only)[/]")
-        train_one_epoch(
-            model=model,
-            dl=train_dl,
-            opt=opt,
-            scaler=scaler,
-            criterion=criterion,
-            device=device,
-            use_cuda_amp=use_cuda,
-            progress=progress,
-            task=warm_task,
-            accum_steps=1,
-        )
+            warm_task = progress.add_task(
+                "warmup (head only)",
+                total=len(train_dl),
+                extra="",
+            )
+            console.print("[bold]Warmup (head only)[/]")
+            train_one_epoch(
+                model=model,
+                dl=train_dl,
+                opt=warm_opt,
+                scaler=scaler,
+                criterion=criterion,
+                device=device,
+                use_cuda_amp=use_cuda,
+                progress=progress,
+                task=warm_task,
+                accum_steps=1,
+            )
 
-        # Validate after warmup
-        res = evaluate(model, val_dl, device)
-        console.print(
-            f"[bold cyan]warmup[/] | val_acc={res.acc:.4f} ({res.correct}/{res.total})",
-        )
-        best_val_acc = res.acc
-        best_epoch = 0
-        save_best(model, opt, sched=None, epoch=best_epoch)
+            res = evaluate(model, val_dl, device)
+            console.print(
+                f"[bold cyan]warmup[/] | val_acc={res.acc:.4f} ({res.correct}/{res.total})",
+            )
+            best_val_acc = res.acc
+            best_epoch = 0
+            warmup_done = True
 
-        # -------------------- Phase 2: full fine-tune --------------------- #
-        for p in model.parameters():
-            p.requires_grad = True
+        for param in model.parameters():
+            param.requires_grad = True
 
-        # Smaller fine-tune batch for laptop VRAM + gradient accumulation
         ft_batch_size = 32
         effective_batch = 128
         accum_steps_ft = max(1, effective_batch // ft_batch_size)
@@ -326,13 +345,13 @@ def main() -> None:  # noqa: PLR0915
             f"(effective ≈ {ft_batch_size * accum_steps_ft})",
         )
 
-        train_dl = DataLoader(
+        train_dl_ft = DataLoader(
             train_dl.dataset,
             batch_size=ft_batch_size,
             shuffle=True,
-            num_workers=NUM_WORKERS,
+            num_workers=num_workers,
             pin_memory=True,
-            persistent_workers=NUM_WORKERS > 0,
+            persistent_workers=num_workers > 0,
             prefetch_factor=2,
         )
 
@@ -341,13 +360,30 @@ def main() -> None:  # noqa: PLR0915
             lr=FT_LR,
             weight_decay=FT_WD,
         )
-        scheduler = optim.lr_scheduler.CosineAnnealingLR(opt, T_max=max(1, EPOCHS - 1))
+        scheduler = optim.lr_scheduler.CosineAnnealingLR(opt, T_max=max(1, epochs - 1))
 
-        for epoch in range(1, EPOCHS + 1):
-            task = progress.add_task(f"epoch {epoch}", total=len(train_dl), extra="")
+        start_epoch = 0
+        resume_state = maybe_load_checkpoint(
+            env,
+            model=model,
+            optimizer=opt,
+            scheduler=scheduler,
+        )
+        if resume_state is not None:
+            start_epoch = int(resume_state.get("epoch", 0))
+            best_val_acc = float(resume_state.get("best_val_acc", best_val_acc))
+            best_epoch = int(resume_state.get("best_epoch", best_epoch))
+            warmup_done = bool(resume_state.get("warmup_done", warmup_done))
+            epochs_no_improve = max(0, start_epoch - best_epoch)
+            console.print(
+                f"[bold green]Resumed[/] from epoch {start_epoch} using {env.resume_checkpoint}",
+            )
+
+        for epoch in range(start_epoch + 1, epochs + 1):
+            task = progress.add_task(f"epoch {epoch}", total=len(train_dl_ft), extra="")
             train_one_epoch(
                 model=model,
-                dl=train_dl,
+                dl=train_dl_ft,
                 opt=opt,
                 scaler=scaler,
                 criterion=criterion,
@@ -370,23 +406,37 @@ def main() -> None:  # noqa: PLR0915
                 best_val_acc = res.acc
                 best_epoch = epoch
                 epochs_no_improve = 0
-                save_best(model, opt, scheduler, epoch)
-                console.print(
-                    f"[bold green]↑ new best[/] val_acc={best_val_acc:.4f} "
-                    f"(epoch {best_epoch}) → saved {BEST_WEIGHTS.name}",
-                )
             else:
                 epochs_no_improve += 1
-                if epochs_no_improve >= PATIENCE:
-                    console.print(
-                        f"[bold yellow]Early stopping[/]: no improvement for "
-                        f"{PATIENCE} epoch(s). Best at epoch {best_epoch} "
-                        f"with val_acc={best_val_acc:.4f}.",
-                    )
-                    break
 
-    console.print(f"[bold green]Best weights saved →[/] {BEST_WEIGHTS.resolve()}")
-    console.print(f"[bold green]Best checkpoint saved →[/] {BEST_CKPT.resolve()}")
+            state = save_latest_checkpoint(
+                env,
+                model=model,
+                optimizer=opt,
+                scheduler=scheduler,
+                epoch=epoch,
+                best_val_acc=best_val_acc,
+                best_epoch=best_epoch,
+                extra={"warmup_done": warmup_done},
+            )
+
+            if improved:
+                save_best_checkpoint(env, state)
+                console.print(
+                    f"[bold green]↑ new best[/] val_acc={best_val_acc:.4f} "
+                    f"(epoch {best_epoch}) → saved {env.best_weights_path.name}",
+                )
+            elif epochs_no_improve >= PATIENCE:
+                console.print(
+                    f"[bold yellow]Early stopping[/]: no improvement for {PATIENCE} epoch(s). "
+                    f"Best at epoch {best_epoch} with val_acc={best_val_acc:.4f}.",
+                )
+                break
+
+    console.print(f"[bold green]Best weights saved →[/] {env.best_weights_path.resolve()}")
+    console.print(
+        f"[bold green]Best checkpoint saved →[/] {env.best_checkpoint_path.resolve()}",
+    )
 
 
 if __name__ == "__main__":

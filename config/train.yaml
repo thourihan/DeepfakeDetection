@@ -1,0 +1,37 @@
+seed: 1337
+device: cuda
+
+data:
+  root: data/DeepFakeFrames
+  train_split: train
+  val_split: val
+  num_classes: 2
+  img_size: 224
+
+models:
+  efficientnet_b3:
+    output_dir: runs/efficientnet_b3
+    training:
+      epochs: 10
+      batch_size: 64
+      num_workers: 4
+      resume: auto
+  efficientformer_v2_s1:
+    output_dir: runs/efficientformer_v2_s1
+    training:
+      epochs: 12
+      batch_size: 128
+      num_workers: 8
+      resume: auto
+  faster_vit_2_224:
+    output_dir: runs/faster_vit_2_224
+    training:
+      epochs: 12
+      batch_size: 64
+      num_workers: 8
+      resume: auto
+
+selection:
+  - efficientnet_b3
+  - efficientformer_v2_s1
+  - faster_vit_2_224
