@@ -45,21 +45,63 @@ def ensure_run_dir(base: Path, timestamp: str) -> Path:
 
 def stream_subprocess(cmd: list[str], *, env: dict[str, str], cwd: Path, log_path: Path) -> int:
     console.print(f"[bold blue]→ Running[/] {' '.join(cmd)}")
-    with log_path.open("w", encoding="utf-8") as log_file:
-        process = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            cwd=str(cwd),
-            env=env,
-            bufsize=1,
-        )
-        assert process.stdout is not None
-        for line in process.stdout:
-            log_file.write(line)
-            console.print(line.rstrip())
+    env = env.copy()
+    env.setdefault("PYTHONUNBUFFERED", "1")
+
+    use_pty = os.name != "nt" and sys.stdout.isatty()
+    if use_pty:
+        import pty
+        import select
+
+        master_fd, slave_fd = pty.openpty()
+        try:
+            process = subprocess.Popen(
+                cmd,
+                stdin=None,
+                stdout=slave_fd,
+                stderr=slave_fd,
+                cwd=str(cwd),
+                env=env,
+                close_fds=True,
+            )
+        finally:
+            os.close(slave_fd)
+
+        with log_path.open("wb") as log_file:
+            try:
+                while True:
+                    ready, _, _ = select.select([master_fd], [], [], 0.1)
+                    if master_fd in ready:
+                        data = os.read(master_fd, 1024)
+                        if not data:
+                            if process.poll() is not None:
+                                break
+                            continue
+                        sys.stdout.buffer.write(data)
+                        sys.stdout.flush()
+                        log_file.write(data)
+                        log_file.flush()
+                    elif process.poll() is not None:
+                        break
+            finally:
+                os.close(master_fd)
         return_code = process.wait()
+    else:
+        with log_path.open("w", encoding="utf-8") as log_file:
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                cwd=str(cwd),
+                env=env,
+                bufsize=1,
+            )
+            assert process.stdout is not None
+            for line in process.stdout:
+                log_file.write(line)
+                console.print(line.rstrip())
+            return_code = process.wait()
     if return_code != 0:
         console.print(f"[bold red]Command failed with code {return_code}[/]")
     return return_code
