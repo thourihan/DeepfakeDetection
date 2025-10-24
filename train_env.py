@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import os
 import random
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -183,6 +184,32 @@ def maybe_load_checkpoint(
     return state
 
 
+def require_num_classes(dataset: Any, expected: int, *, split: str) -> None:
+    """Ensure an ImageFolder-style dataset exposes the configured classes."""
+
+    if expected <= 0:
+        raise ValueError("expected number of classes must be positive")
+
+    classes: Sequence[Any] | None = getattr(dataset, "classes", None)
+    if classes is None:
+        return
+
+    actual = len(classes)
+    if actual == expected:
+        return
+
+    preview = ", ".join(str(name) for name in classes[: min(5, actual)])
+    if actual > 5:
+        preview += ", …"
+    raise ValueError(
+        "Class count mismatch for split "
+        f"'{split}': dataset exposes {actual} classes ({preview}) "
+        f"but configuration sets DD_NUM_CLASSES={expected}. "
+        "Update config.data.num_classes (e.g., match it to the true number of "
+        "categories in your ImageFolder)."
+    )
+
+
 __all__ = [
     "TrainingEnvironment",
     "apply_seed",
@@ -191,6 +218,7 @@ __all__ = [
     "env_str",
     "maybe_load_checkpoint",
     "prepare_training_environment",
+    "require_num_classes",
     "save_best_checkpoint",
     "save_latest_checkpoint",
 ]

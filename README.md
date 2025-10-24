@@ -89,6 +89,12 @@ declare which backbones should run for the current pass.
 Pass `--config` to override the defaults (e.g., a custom experiment
 file) while retaining the same structure.
 
+> **Important:** keep `data.num_classes` aligned with the number of
+> folders/classes in your ImageFolder splits (e.g., set it to `10` for
+> MNIST). The trainers validate this before launching to avoid hard-to-
+> debug CUDA assertions when the head dimension disagrees with the
+> labels provided by the dataset.
+
 Each run directory contains `checkpoints/` (latest & best checkpoints),
 `logs/` (console output plus JSONL metrics), and `plots/` (confusion
 matrix and ROC curve when labels are available). The setup targets

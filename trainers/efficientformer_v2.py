@@ -40,6 +40,7 @@ from train_env import (
     env_str,
     maybe_load_checkpoint,
     prepare_training_environment,
+    require_num_classes,
     save_best_checkpoint,
     save_latest_checkpoint,
 )
@@ -77,6 +78,8 @@ def get_loaders(
     img_size: int,
     batch_size: int,
     num_workers: int,
+    *,
+    expected_classes: int | None = None,
 ) -> tuple[DataLoader, DataLoader]:
     """Build train/validation loaders with light augmentations on train."""
     train_t = transforms.Compose(
@@ -96,6 +99,8 @@ def get_loaders(
     )
 
     train_ds = datasets.ImageFolder(data_root / train_split, transform=train_t)
+    if expected_classes is not None:
+        require_num_classes(train_ds, expected_classes, split=train_split)
     val_ds = datasets.ImageFolder(data_root / val_split, transform=val_t)
 
     train_dl = DataLoader(
@@ -211,14 +216,26 @@ def main() -> None:  # noqa: PLR0915
         )
         raise SystemExit(1)
 
-    train_dl, val_dl = get_loaders(
-        data_root,
-        train_split,
-        val_split,
-        img_size,
-        batch_size,
-        num_workers,
-    )
+    try:
+        train_dl, val_dl = get_loaders(
+            data_root,
+            train_split,
+            val_split,
+            img_size,
+            batch_size,
+            num_workers,
+            expected_classes=num_classes,
+        )
+    except ValueError as exc:
+        console.print(
+            "[bold red]Class configuration mismatch[/]",
+            f"→ {exc}",
+        )
+        console.print(
+            "Update `data.num_classes` in your YAML to match the dataset. "
+            "For MNIST, set it to 10.",
+        )
+        raise SystemExit(1) from exc
     console.print(
         f"[bold]Data[/]: train={len(train_dl.dataset)} | val={len(val_dl.dataset)} | "
         f"bs={batch_size} | steps/epoch={len(train_dl)}",
