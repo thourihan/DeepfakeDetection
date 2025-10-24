@@ -11,6 +11,18 @@ data:
 models:
   efficientnet_b3:
     output_dir: runs/efficientnet_b3
+    transforms:
+      train:
+        ensure_rgb: true
+        train_random_resized_crop: true
+        train_random_horizontal_flip: true
+        train_random_rotation: true
+        train_color_jitter: true
+        train_random_erasing: true
+      eval:
+        ensure_rgb: true
+        val_resize: true
+        val_center_crop: true
     training:
       epochs: 10
       batch_size: 64
@@ -18,6 +30,16 @@ models:
       resume: auto
   efficientformer_v2_s1:
     output_dir: runs/efficientformer_v2_s1
+    transforms:
+      train:
+        ensure_rgb: true
+        train_random_resized_crop: true
+        train_random_horizontal_flip: true
+        train_color_jitter: true
+      eval:
+        ensure_rgb: true
+        val_resize: true
+        val_center_crop: true
     training:
       epochs: 12
       batch_size: 128
@@ -25,6 +47,16 @@ models:
       resume: auto
   faster_vit_2_224:
     output_dir: runs/faster_vit_2_224
+    transforms:
+      train:
+        ensure_rgb: true
+        train_random_resized_crop: true
+        train_random_horizontal_flip: true
+        train_color_jitter: true
+      eval:
+        ensure_rgb: true
+        val_resize: true
+        val_center_crop: true
     training:
       epochs: 12
       batch_size: 64

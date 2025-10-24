@@ -110,6 +110,16 @@ def load_config(path: Path) -> dict[str, Any]:
         return yaml.safe_load(handle)
 
 
+def _coerce_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int | float):
+        return bool(value)
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "on"}
+    return False
+
+
 def ensure_run_dirs(base: Path, timestamp: str) -> RunPaths:
     run_dir = base / timestamp
     checkpoints = run_dir / "checkpoints"
@@ -132,6 +142,27 @@ def snapshot_config(run_paths: RunPaths, *, config: dict[str, Any], model_cfg: d
     }
     with (run_paths.run_dir / "config_snapshot.yaml").open("w", encoding="utf-8") as handle:
         yaml.safe_dump(snapshot, handle)
+
+
+def resolve_transform_mapping(model_cfg: dict[str, Any], *, phase: str) -> dict[str, Any] | None:
+    """Return a mapping of transform toggles for ``phase`` if configured."""
+
+    transforms_cfg = model_cfg.get("transforms")
+    if isinstance(transforms_cfg, dict):
+        phase_cfg = transforms_cfg.get(phase)
+        if isinstance(phase_cfg, dict):
+            return phase_cfg
+        if all(isinstance(v, bool | int | float | str) for v in transforms_cfg.values()):
+            return transforms_cfg
+
+    if phase == "train":
+        scoped = model_cfg.get("training", {}).get("transforms")
+    else:
+        scoped = model_cfg.get("inference", {}).get("transforms")
+    if isinstance(scoped, dict):
+        return scoped
+
+    return None
 
 
 def build_env_overrides(
@@ -189,6 +220,11 @@ def build_env_overrides(
         if "num_workers" in infer_cfg:
             overrides["DD_NUM_WORKERS"] = str(infer_cfg["num_workers"])
 
+    phase_key = "train" if training else "eval"
+    transform_overrides = resolve_transform_mapping(model_cfg, phase=phase_key)
+    if transform_overrides:
+        overrides["DD_TRANSFORMS"] = json.dumps(transform_overrides)
+
     return overrides
 
 
@@ -219,16 +255,36 @@ def _ensure_rgb(image: Image.Image) -> Image.Image:
     return image
 
 
-def build_eval_transforms(image_size: int) -> transforms.Compose:
-    return transforms.Compose(
-        [
-            transforms.Lambda(_ensure_rgb),
-            transforms.Resize(image_size),
-            transforms.CenterCrop(image_size),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-        ]
-    )
+def build_eval_transforms(
+    image_size: int,
+    *,
+    toggles: dict[str, Any] | None = None,
+) -> transforms.Compose:
+    defaults = {
+        "ensure_rgb": True,
+        "val_resize": True,
+        "val_center_crop": True,
+        "val_to_tensor": True,
+        "val_normalize": True,
+    }
+    resolved = dict(defaults)
+    if toggles:
+        for key, value in toggles.items():
+            resolved[key] = _coerce_bool(value)
+
+    ops: list[object] = []
+    if resolved.get("ensure_rgb", True):
+        ops.append(transforms.Lambda(_ensure_rgb))
+    if resolved.get("val_resize", True):
+        ops.append(transforms.Resize(image_size))
+    if resolved.get("val_center_crop", True):
+        ops.append(transforms.CenterCrop(image_size))
+    if resolved.get("val_to_tensor", True):
+        ops.append(transforms.ToTensor())
+    if resolved.get("val_normalize", True):
+        ops.append(transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]))
+
+    return transforms.Compose(ops)
 
 
 def load_model(
@@ -341,7 +397,8 @@ def _run_inference_job(
             weights_path = (config_path.parent / weights_path).resolve()
 
     model = load_model(model_cfg["name"], num_classes, weights_path, device)
-    transforms_eval = build_eval_transforms(image_size)
+    eval_toggles = resolve_transform_mapping(model_cfg, phase="eval")
+    transforms_eval = build_eval_transforms(image_size, toggles=eval_toggles)
 
     data_root_value = data_cfg.get("root", "data/DeepFakeFrames")
     data_root = Path(data_root_value).expanduser()

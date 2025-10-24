@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import atexit
 import io
+import json
 import os
 import random
 import sys
@@ -92,6 +93,58 @@ def create_console(*, width: int | None = None) -> Console:
 
     force_terminal = bool(getattr(sys.stdout, "isatty", lambda: False)())
     return Console(file=stream, force_terminal=force_terminal, width=width)
+
+
+def _as_bool(value: Any) -> bool:
+    """Best-effort boolean coercion used for transform toggles."""
+
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int | float):
+        return bool(value)
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "on"}
+    return False
+
+
+def load_transform_toggles(
+    defaults: dict[str, bool],
+    *,
+    env_var: str = "DD_TRANSFORMS",
+    required: Sequence[str] | None = None,
+) -> dict[str, bool]:
+    """Return per-transform enable flags supplied via environment variables.
+
+    Parameters
+    ----------
+    defaults:
+        Baseline toggle values for each transform key.
+    env_var:
+        Environment variable that may contain a JSON mapping of
+        ``{"transform_name": bool}`` overrides. Missing keys default to
+        ``defaults``.
+    required:
+        Keys that must remain enabled. If an override disables them the value
+        is forced back to ``True`` to avoid breaking the data pipeline.
+    """
+
+    toggles = dict(defaults)
+    overrides_raw = os.environ.get(env_var)
+    if overrides_raw:
+        try:
+            parsed = json.loads(overrides_raw)
+        except json.JSONDecodeError:
+            parsed = None
+        if isinstance(parsed, dict):
+            for key, value in parsed.items():
+                toggles[key] = _as_bool(value)
+
+    if required:
+        for key in required:
+            if not toggles.get(key, False):
+                toggles[key] = True
+
+    return toggles
 
 
 def prepare_training_environment(

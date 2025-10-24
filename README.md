@@ -101,3 +101,26 @@ Each run directory contains `checkpoints/` (latest & best checkpoints),
 matrix and ROC curve when labels are available). The setup targets
 frame-level deepfake vs. real classification but works for multiclass
 ImageFolder datasets as well (e.g., MNIST variants converted to RGB).
+
+### Per-model transform toggles
+
+Every transform in the training and evaluation pipelines can be toggled on
+or off per backbone. Add a `transforms:` block under each `models.<name>`
+entry in the YAML config and set the boolean switches you need:
+
+```yaml
+models:
+  efficientnet_b3:
+    transforms:
+      train:
+        train_random_resized_crop: true
+        train_random_erasing: false  # disable heavy augmentations for MNIST
+      eval:
+        val_center_crop: false       # skip center crop, keep resize only
+```
+
+Unspecified keys fall back to sensible defaults (matching the original
+pipelines). The orchestrator forwards the selected toggles to the trainer via
+environment variables, so you can keep the YAML concise and share the same
+model code for laptop-friendly MNIST experiments and augmentation-heavy
+deepfake datasets.

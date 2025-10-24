@@ -46,6 +46,7 @@ from train_env import (
     env_int,
     env_path,
     env_str,
+    load_transform_toggles,
     maybe_load_checkpoint,
     prepare_training_environment,
     require_num_classes,
@@ -115,47 +116,83 @@ def get_loaders(
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     small_images = img_size <= 64
 
+    defaults = {
+        "ensure_rgb": True,
+        "train_resize": True,
+        "train_random_crop": small_images,
+        "train_center_crop": False,
+        "train_random_resized_crop": not small_images,
+        "train_random_horizontal_flip": True,
+        "train_random_rotation": False,
+        "train_color_jitter": not small_images,
+        "train_random_erasing": False,
+        "train_to_tensor": True,
+        "train_normalize": True,
+        "val_resize": True,
+        "val_center_crop": True,
+        "val_to_tensor": True,
+        "val_normalize": True,
+    }
+    toggles = load_transform_toggles(
+        defaults,
+        required=("train_to_tensor", "train_normalize", "val_to_tensor", "val_normalize"),
+    )
+
+    train_ops: list[object] = []
+    if toggles.get("ensure_rgb", True):
+        train_ops.append(transforms.Lambda(_ensure_rgb))
+
     if small_images:
-        train_t = transforms.Compose(
-            [
-                transforms.Lambda(_ensure_rgb),
+        if toggles.get("train_resize", True):
+            train_ops.append(
                 transforms.Resize(img_size + 4, interpolation=InterpolationMode.BILINEAR),
-                transforms.RandomCrop(img_size),
-                transforms.RandomHorizontalFlip(),
-                transforms.ToTensor(),
-                normalize,
-            ],
-        )
-        val_t = transforms.Compose(
-            [
-                transforms.Lambda(_ensure_rgb),
-                transforms.Resize(img_size, interpolation=InterpolationMode.BILINEAR),
-                transforms.CenterCrop(img_size),
-                transforms.ToTensor(),
-                normalize,
-            ],
-        )
+            )
+        if toggles.get("train_random_crop", True):
+            train_ops.append(transforms.RandomCrop(img_size))
+        elif toggles.get("train_center_crop", False):
+            train_ops.append(transforms.CenterCrop(img_size))
     else:
         resize_shorter = max(img_size + 32, int(img_size * 1.15))
-        train_t = transforms.Compose(
-            [
-                transforms.Lambda(_ensure_rgb),
-                transforms.RandomResizedCrop(img_size, scale=(0.9, 1.0)),
-                transforms.RandomHorizontalFlip(),
-                transforms.ColorJitter(0.1, 0.1, 0.1, 0.05),
-                transforms.ToTensor(),
-                normalize,
-            ],
+        if toggles.get("train_random_resized_crop", True):
+            train_ops.append(transforms.RandomResizedCrop(img_size, scale=(0.9, 1.0)))
+        else:
+            if toggles.get("train_resize", True):
+                train_ops.append(
+                    transforms.Resize(resize_shorter, interpolation=InterpolationMode.BILINEAR),
+                )
+            if toggles.get("train_center_crop", True):
+                train_ops.append(transforms.CenterCrop(img_size))
+
+    if toggles.get("train_random_horizontal_flip", True):
+        train_ops.append(transforms.RandomHorizontalFlip())
+    if toggles.get("train_random_rotation", False):
+        train_ops.append(transforms.RandomRotation(10))
+    if toggles.get("train_color_jitter", False):
+        train_ops.append(transforms.ColorJitter(0.1, 0.1, 0.1, 0.05))
+    if toggles.get("train_to_tensor", True):
+        train_ops.append(transforms.ToTensor())
+    if toggles.get("train_normalize", True):
+        train_ops.append(normalize)
+    if toggles.get("train_random_erasing", False):
+        train_ops.append(
+            transforms.RandomErasing(p=0.5, scale=(0.02, 0.33), ratio=(0.3, 3.3), value=0)
         )
-        val_t = transforms.Compose(
-            [
-                transforms.Lambda(_ensure_rgb),
-                transforms.Resize(resize_shorter, interpolation=InterpolationMode.BILINEAR),
-                transforms.CenterCrop(img_size),
-                transforms.ToTensor(),
-                normalize,
-            ],
-        )
+
+    val_ops: list[object] = []
+    if toggles.get("ensure_rgb", True):
+        val_ops.append(transforms.Lambda(_ensure_rgb))
+    if toggles.get("val_resize", True):
+        resize_target = max(img_size + 32, int(img_size * 1.15)) if not small_images else img_size
+        val_ops.append(transforms.Resize(resize_target, interpolation=InterpolationMode.BILINEAR))
+    if toggles.get("val_center_crop", True):
+        val_ops.append(transforms.CenterCrop(img_size))
+    if toggles.get("val_to_tensor", True):
+        val_ops.append(transforms.ToTensor())
+    if toggles.get("val_normalize", True):
+        val_ops.append(normalize)
+
+    train_t = transforms.Compose(train_ops)
+    val_t = transforms.Compose(val_ops)
 
     train_ds = datasets.ImageFolder(data_root / train_split, transform=train_t)
     if expected_classes is not None:

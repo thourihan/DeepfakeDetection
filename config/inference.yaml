@@ -10,6 +10,11 @@ data:
 models:
   efficientnet_b3:
     output_dir: runs/efficientnet_b3
+    transforms:
+      eval:
+        ensure_rgb: true
+        val_resize: true
+        val_center_crop: true
     inference:
       weights: weights/EfficientNet_10_21_2025.pth
       split: test
@@ -17,6 +22,11 @@ models:
       num_workers: 2
   efficientformer_v2_s1:
     output_dir: runs/efficientformer_v2_s1
+    transforms:
+      eval:
+        ensure_rgb: true
+        val_resize: true
+        val_center_crop: true
     inference:
       weights: weights/EfficientFormerV2_S1.pth
       split: test
@@ -24,6 +34,11 @@ models:
       num_workers: 4
   faster_vit_2_224:
     output_dir: runs/faster_vit_2_224
+    transforms:
+      eval:
+        ensure_rgb: true
+        val_resize: true
+        val_center_crop: true
     inference:
       weights: weights/FasterViT_2_224.pth
       split: test
