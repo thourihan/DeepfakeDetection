@@ -25,7 +25,7 @@ from time import perf_counter
 
 import torch
 from efficientnet_pytorch import EfficientNet
-from rich.console import Console
+from PIL import Image
 from rich.progress import (
     BarColumn,
     MofNCompleteColumn,
@@ -38,9 +38,11 @@ from rich.progress import (
 from torch import nn, optim
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
+from torchvision.transforms import InterpolationMode
 
 from train_env import (
     apply_seed,
+    create_console,
     env_int,
     env_path,
     env_str,
@@ -83,7 +85,15 @@ ACCUM_STEPS: int = max(1, EFFECTIVE_BATCH // FT_BATCH_SIZE)
 
 # --------------------------------------------------------------------- #
 
-console = Console()
+console = create_console()
+
+
+def _ensure_rgb(image: Image.Image) -> Image.Image:
+    """Convert grayscale frames to RGB for ImageNet pre-trained models."""
+
+    if getattr(image, "mode", "RGB") != "RGB":
+        return image.convert("RGB")  # type: ignore[no-any-return]
+    return image
 
 
 @dataclass(frozen=True)
@@ -107,36 +117,60 @@ def get_loaders(
     expected_classes: int | None = None,
 ) -> tuple[DataLoader, DataLoader]:
     """Build train/validation loaders. EfficientNet expects ImageNet norm."""
-    train_t = transforms.Compose(
-        [
-            transforms.RandomResizedCrop(img_size, scale=(0.9, 1.0)),
-            transforms.RandomHorizontalFlip(),
-            transforms.RandomRotation(10),
-            transforms.ColorJitter(0.2, 0.2, 0.2, 0.05),
-            transforms.ToTensor(),
-            transforms.Normalize(
-                mean=[0.485, 0.456, 0.406],
-                std=[0.229, 0.224, 0.225],
-            ),
-            transforms.RandomErasing(
-                p=0.5,
-                scale=(0.02, 0.33),
-                ratio=(0.3, 3.3),
-                value=0,
-            ),
-        ],
+    normalize = transforms.Normalize(
+        mean=[0.485, 0.456, 0.406],
+        std=[0.229, 0.224, 0.225],
     )
-    val_t = transforms.Compose(
-        [
-            transforms.Resize(256),
-            transforms.CenterCrop(img_size),
-            transforms.ToTensor(),
-            transforms.Normalize(
-                mean=[0.485, 0.456, 0.406],
-                std=[0.229, 0.224, 0.225],
-            ),
-        ],
-    )
+    small_images = img_size <= 64
+
+    if small_images:
+        train_t = transforms.Compose(
+            [
+                transforms.Lambda(_ensure_rgb),
+                transforms.Resize(img_size + 4, interpolation=InterpolationMode.BILINEAR),
+                transforms.RandomCrop(img_size),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                normalize,
+            ],
+        )
+        val_t = transforms.Compose(
+            [
+                transforms.Lambda(_ensure_rgb),
+                transforms.Resize(img_size, interpolation=InterpolationMode.BILINEAR),
+                transforms.CenterCrop(img_size),
+                transforms.ToTensor(),
+                normalize,
+            ],
+        )
+    else:
+        resize_shorter = max(img_size + 32, int(img_size * 1.15))
+        train_t = transforms.Compose(
+            [
+                transforms.Lambda(_ensure_rgb),
+                transforms.RandomResizedCrop(img_size, scale=(0.9, 1.0)),
+                transforms.RandomHorizontalFlip(),
+                transforms.RandomRotation(10),
+                transforms.ColorJitter(0.2, 0.2, 0.2, 0.05),
+                transforms.ToTensor(),
+                normalize,
+                transforms.RandomErasing(
+                    p=0.5,
+                    scale=(0.02, 0.33),
+                    ratio=(0.3, 3.3),
+                    value=0,
+                ),
+            ],
+        )
+        val_t = transforms.Compose(
+            [
+                transforms.Lambda(_ensure_rgb),
+                transforms.Resize(resize_shorter, interpolation=InterpolationMode.BILINEAR),
+                transforms.CenterCrop(img_size),
+                transforms.ToTensor(),
+                normalize,
+            ],
+        )
 
     train_ds = datasets.ImageFolder(data_root / train_split, transform=train_t)
     if expected_classes is not None:
@@ -150,7 +184,7 @@ def get_loaders(
         num_workers=num_workers,
         pin_memory=True,
         persistent_workers=num_workers > 0,
-        prefetch_factor=2,
+        **({"prefetch_factor": 2} if num_workers > 0 else {}),
     )
     val_dl = DataLoader(
         val_ds,
@@ -159,7 +193,7 @@ def get_loaders(
         num_workers=num_workers,
         pin_memory=True,
         persistent_workers=num_workers > 0,
-        prefetch_factor=2,
+        **({"prefetch_factor": 2} if num_workers > 0 else {}),
     )
     return train_dl, val_dl
 

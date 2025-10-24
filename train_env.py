@@ -10,8 +10,11 @@ layer.
 
 from __future__ import annotations
 
+import atexit
+import io
 import os
 import random
+import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -19,6 +22,7 @@ from typing import Any
 
 import numpy as np
 import torch
+from rich.console import Console
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 
@@ -36,6 +40,58 @@ class TrainingEnvironment:
     resume_checkpoint: Path | None
     seed: int | None
     device_override: str | None
+
+
+_LOG_HANDLES: list[io.TextIOBase] = []
+
+
+class _TeeStream(io.TextIOBase):
+    """Duplicate writes to both the terminal and a log file."""
+
+    def __init__(self, primary: io.TextIOBase, secondary: io.TextIOBase) -> None:
+        super().__init__()
+        self._primary = primary
+        self._secondary = secondary
+        self._encoding = getattr(primary, "encoding", "utf-8")
+
+    def write(self, data: str) -> int:  # noqa: D401 - TextIOBase contract
+        self._primary.write(data)
+        self._secondary.write(data)
+        return len(data)
+
+    def flush(self) -> None:
+        self._primary.flush()
+        self._secondary.flush()
+
+    def isatty(self) -> bool:  # noqa: D401 - TextIOBase contract
+        return bool(getattr(self._primary, "isatty", lambda: False)())
+
+    @property
+    def encoding(self) -> str:  # noqa: D401 - TextIOBase contract
+        return self._encoding
+
+    def close(self) -> None:
+        try:
+            self._secondary.close()
+        finally:
+            super().close()
+
+
+def create_console(*, width: int | None = None) -> Console:
+    """Build a Rich console that mirrors output to ``DD_LOG_PATH`` if provided."""
+
+    log_path_value = os.environ.get("DD_LOG_PATH")
+    stream: io.TextIOBase = sys.stdout
+    if log_path_value:
+        log_path = Path(log_path_value).expanduser()
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_file = log_path.open("a", encoding="utf-8")
+        _LOG_HANDLES.append(log_file)
+        atexit.register(log_file.close)
+        stream = _TeeStream(stream, log_file)
+
+    force_terminal = bool(getattr(sys.stdout, "isatty", lambda: False)())
+    return Console(file=stream, force_terminal=force_terminal, width=width)
 
 
 def prepare_training_environment(

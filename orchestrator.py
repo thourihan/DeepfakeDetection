@@ -87,6 +87,13 @@ def tee_output(log_path: Path) -> Iterator[None]:
                 stdout.flush()
                 log_file.flush()
 
+            def isatty(self) -> bool:  # noqa: D401 - standard file contract
+                return bool(getattr(stdout, "isatty", lambda: False)())
+
+            @property
+            def encoding(self) -> str:  # noqa: D401 - standard file contract
+                return getattr(stdout, "encoding", "utf-8")
+
         tee = Tee()
         sys.stdout = tee  # type: ignore[assignment]
         sys.stderr = tee  # type: ignore[assignment]
@@ -196,10 +203,13 @@ def import_trainer(module_name: str) -> Any:
 def run_training_job(config: dict[str, Any], model_cfg: dict[str, Any], run_paths: RunPaths) -> None:
     spec = get_model_spec(model_cfg["name"])
     overrides = build_env_overrides(config=config, model_cfg=model_cfg, run_paths=run_paths, training=True)
-    trainer_main = import_trainer(spec.train_module)
+    log_path = run_paths.logs / "train.log"
+    log_path.unlink(missing_ok=True)
+    overrides["DD_LOG_PATH"] = str(log_path)
 
     console.print(f"[bold]→ training {model_cfg['name']}[/]")
-    with patched_environ(overrides), tee_output(run_paths.logs / "train.log"):
+    with patched_environ(overrides):
+        trainer_main = import_trainer(spec.train_module)
         trainer_main()
 
 
@@ -288,9 +298,29 @@ def run_inference_job(
     model_cfg: dict[str, Any],
     run_paths: RunPaths,
 ) -> None:
+    console.print(f"[bold]→ inference {model_cfg['name']}[/]")
+    log_path = run_paths.logs / "inference.log"
+    log_path.unlink(missing_ok=True)
+
+    with tee_output(log_path):
+        _run_inference_job(config_path=config_path, config=config, model_cfg=model_cfg, run_paths=run_paths)
+
+
+def _run_inference_job(
+    *,
+    config_path: Path,
+    config: dict[str, Any],
+    model_cfg: dict[str, Any],
+    run_paths: RunPaths,
+) -> None:
+    local_console = Console(file=sys.stdout, force_terminal=bool(getattr(sys.stdout, "isatty", lambda: False)()))
     spec = get_model_spec(model_cfg["name"])
     data_cfg = config.get("data", {})
     infer_cfg = model_cfg.get("inference", {})
+    split_name = infer_cfg.get("split", data_cfg.get("test_split", "test"))
+    local_console.print(
+        f"[bold]Model[/]: {model_cfg['name']} | split={split_name} | batch={infer_cfg.get('batch_size', 64)}",
+    )
 
     num_classes = int(model_cfg.get("num_classes", data_cfg.get("num_classes", 2)))
     image_size = int(infer_cfg.get("img_size", data_cfg.get("img_size", spec.default_image_size)))
@@ -299,7 +329,7 @@ def run_inference_job(
 
     device_str = config.get("device", "cuda")
     if device_str.startswith("cuda") and not torch.cuda.is_available():
-        console.print("[bold yellow]⚠️  CUDA requested but unavailable[/]: using CPU")
+        local_console.print("[bold yellow]⚠️  CUDA requested but unavailable[/]: using CPU")
         device_str = "cpu"
     device = torch.device(device_str)
 
@@ -318,15 +348,15 @@ def run_inference_job(
     if not data_root.is_absolute():
         data_root = (config_path.parent / data_root).resolve()
 
-    split = infer_cfg.get("split", data_cfg.get("test_split", "test"))
+    split = split_name
     dataset_path = data_root / split
     if not dataset_path.exists():
-        console.print(f"[bold red]Split not found:[/] {dataset_path}")
+        local_console.print(f"[bold red]Split not found:[/] {dataset_path}")
         raise SystemExit(1)
 
     dataset = datasets.ImageFolder(dataset_path, transform=transforms_eval)
     if len(dataset) == 0:
-        console.print(f"[bold yellow]No images found in[/] {dataset_path}")
+        local_console.print(f"[bold yellow]No images found in[/] {dataset_path}")
         return
 
     dataloader = build_inference_loader(dataset=dataset, batch_size=batch_size, num_workers=num_workers)
@@ -338,7 +368,7 @@ def run_inference_job(
         TimeElapsedColumn(),
         TimeRemainingColumn(),
         TextColumn("{task.fields[speed]}"),
-        console=console,
+        console=local_console,
     )
 
     all_probs: list[torch.Tensor] = []
@@ -396,7 +426,7 @@ def run_inference_job(
     with metrics_path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(metrics) + "\n")
 
-    console.print(
+    local_console.print(
         "[bold]Accuracy[/]: "
         f"{accuracy:.4f}"
         + " "
