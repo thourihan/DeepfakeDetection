@@ -2,7 +2,7 @@ seed: 1337
 device: cuda
 
 data:
-  root: data/DeepFakeFrames
+  root: data/deepfake_dataset
   test_split: test
   num_classes: 2
   img_size: 224

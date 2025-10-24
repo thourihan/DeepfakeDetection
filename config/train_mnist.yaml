@@ -1,12 +1,12 @@
-seed: 1337
+seed: 1
 device: cuda
 
 data:
-  root: data/deepfake_dataset
+  root: data/mnist
   train_split: train
   val_split: val
-  num_classes: 2
-  img_size: 224
+  num_classes: 10
+  img_size: 28
 
 models:
   efficientnet_b3:
@@ -14,11 +14,14 @@ models:
     transforms:
       train:
         ensure_rgb: true
-        train_random_resized_crop: true
-        train_random_horizontal_flip: true
+        train_resize: true
+        train_random_crop: true
+        train_center_crop: false
+        train_random_resized_crop: false
+        train_random_horizontal_flip: false
         train_random_rotation: true
-        train_color_jitter: true
-        train_random_erasing: true
+        train_color_jitter: false
+        train_random_erasing: false
       eval:
         ensure_rgb: true
         val_resize: true
@@ -26,16 +29,20 @@ models:
     training:
       epochs: 10
       batch_size: 64
-      num_workers: 4
+      num_workers: 8
       resume: auto
   efficientformer_v2_s1:
     output_dir: runs/efficientformer_v2_s1
     transforms:
       train:
         ensure_rgb: true
-        train_random_resized_crop: true
-        train_random_horizontal_flip: true
-        train_color_jitter: true
+        train_resize: true
+        train_random_crop: true
+        train_center_crop: false
+        train_random_resized_crop: false
+        train_random_horizontal_flip: false
+        train_random_rotation: true
+        train_color_jitter: false
       eval:
         ensure_rgb: true
         val_resize: true
@@ -50,16 +57,20 @@ models:
     transforms:
       train:
         ensure_rgb: true
-        train_random_resized_crop: true
-        train_random_horizontal_flip: true
-        train_color_jitter: true
+        train_resize: true
+        train_random_crop: true
+        train_center_crop: false
+        train_random_resized_crop: false
+        train_random_horizontal_flip: false
+        train_random_rotation: true
+        train_color_jitter: false
       eval:
         ensure_rgb: true
         val_resize: true
         val_center_crop: true
     training:
       epochs: 12
-      batch_size: 64
+      batch_size: 96
       num_workers: 8
       resume: auto
 
