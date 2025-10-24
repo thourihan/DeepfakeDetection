@@ -11,3 +11,6 @@ venv/
 # Ignore outputs 
 outputs/
 runs/
+
+# Ignore compiled Python files
+*.pyc
