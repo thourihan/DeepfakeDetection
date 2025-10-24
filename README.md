@@ -70,24 +70,25 @@ To set up the project, follow these steps:
 
 ## Orchestrating runs (training & inference)
 
-The new `orchestrator.py` script provides a thin automation layer for
-deepfake frame classification experiments. It reads dedicated YAML
-configs for each phase—`config/train.yaml` for training and
-`config/inference.yaml` for headless evaluation. Both files list every
-available model in a `models:` mapping and use a `selection:` array to
-declare which backbones should run for the current pass.
+Use the thin `train.py` and `inference.py` wrappers to drive
+experiments without touching per-model scripts. They both route through
+`orchestrator.py`, which reads phase-specific YAML configs—
+`config/train.yaml` for training and `config/inference.yaml` for
+evaluation. Each config lists all supported backbones under `models:`
+and enables a subset via the `selection:` array.
 
 1. **Train models listed in `config/train.yaml`:**
    ```bash
-   python orchestrator.py --mode training
+   python train.py
    ```
 2. **Evaluate models defined in `config/inference.yaml`:**
    ```bash
-   python orchestrator.py --mode inference
+   python inference.py
    ```
 
-Pass `--config` to override the defaults (e.g., a custom experiment
-file) while retaining the same structure.
+Pass `--config` to either script to point at an alternate YAML file (for
+example, a copy with MNIST-specific hyperparameters) while keeping the
+same structure.
 
 > **Important:** keep `data.num_classes` aligned with the number of
 > folders/classes in your ImageFolder splits (e.g., set it to `10` for

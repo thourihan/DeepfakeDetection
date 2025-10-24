@@ -1,25 +1,101 @@
-"""Simple runner to orchestrate training and inference jobs."""
+"""Unified orchestration layer for DeepfakeDetection training and inference."""
 
 from __future__ import annotations
 
 import argparse
+import contextlib
+import importlib
+import io
+import json
 import os
-import random
-import subprocess
 import sys
+from collections.abc import Iterator
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from time import perf_counter
 from typing import Any
 
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import yaml
+from PIL import Image
 from rich.console import Console
+from rich.progress import (
+    BarColumn,
+    MofNCompleteColumn,
+    Progress,
+    TextColumn,
+    TimeElapsedColumn,
+    TimeRemainingColumn,
+)
+from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix, roc_auc_score
+from torch import nn
+from torch.utils.data import DataLoader
+from torchvision import datasets, transforms
 
 from model_registry import get_model_spec
+from train_env import apply_seed
 
 console = Console()
-REPO_ROOT = Path(__file__).resolve().parent
+
+
+@dataclass(frozen=True)
+class RunPaths:
+    """Filesystem layout for a single model run."""
+
+    run_dir: Path
+    checkpoints: Path
+    logs: Path
+    plots: Path
+
+
+@contextlib.contextmanager
+def patched_environ(overrides: dict[str, str]) -> Iterator[None]:
+    """Temporarily set environment variables for a trainer."""
+
+    original: dict[str, str | None] = {}
+    for key, value in overrides.items():
+        original[key] = os.environ.get(key)
+        os.environ[key] = value
+    try:
+        yield
+    finally:
+        for key, value in original.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+
+
+@contextlib.contextmanager
+def tee_output(log_path: Path) -> Iterator[None]:
+    """Mirror stdout/stderr to both the console and a log file."""
+
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    with log_path.open("w", encoding="utf-8") as log_file:
+        stdout, stderr = sys.stdout, sys.stderr
+
+        class Tee(io.TextIOBase):
+            def write(self, data: str) -> int:  # noqa: D401 - standard file contract
+                stdout.write(data)
+                log_file.write(data)
+                return len(data)
+
+            def flush(self) -> None:
+                stdout.flush()
+                log_file.flush()
+
+        tee = Tee()
+        sys.stdout = tee  # type: ignore[assignment]
+        sys.stderr = tee  # type: ignore[assignment]
+        try:
+            yield
+        finally:
+            sys.stdout = stdout  # type: ignore[assignment]
+            sys.stderr = stderr  # type: ignore[assignment]
+            log_file.flush()
 
 
 def load_config(path: Path) -> dict[str, Any]:
@@ -27,140 +103,17 @@ def load_config(path: Path) -> dict[str, Any]:
         return yaml.safe_load(handle)
 
 
-def set_global_seed(seed: int) -> None:
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-
-
-def ensure_run_dir(base: Path, timestamp: str) -> Path:
+def ensure_run_dirs(base: Path, timestamp: str) -> RunPaths:
     run_dir = base / timestamp
-    for sub in (run_dir, run_dir / "checkpoints", run_dir / "logs", run_dir / "plots"):
-        sub.mkdir(parents=True, exist_ok=True)
-    return run_dir
+    checkpoints = run_dir / "checkpoints"
+    logs = run_dir / "logs"
+    plots = run_dir / "plots"
+    for path in (run_dir, checkpoints, logs, plots):
+        path.mkdir(parents=True, exist_ok=True)
+    return RunPaths(run_dir=run_dir, checkpoints=checkpoints, logs=logs, plots=plots)
 
 
-def stream_subprocess(cmd: list[str], *, env: dict[str, str], cwd: Path, log_path: Path) -> int:
-    console.print(f"[bold blue]→ Running[/] {' '.join(cmd)}")
-    env = env.copy()
-    env.setdefault("PYTHONUNBUFFERED", "1")
-
-    use_pty = os.name != "nt" and sys.stdout.isatty()
-    if use_pty:
-        import pty
-        import select
-
-        master_fd, slave_fd = pty.openpty()
-        try:
-            process = subprocess.Popen(
-                cmd,
-                stdin=None,
-                stdout=slave_fd,
-                stderr=slave_fd,
-                cwd=str(cwd),
-                env=env,
-                close_fds=True,
-            )
-        finally:
-            os.close(slave_fd)
-
-        with log_path.open("wb") as log_file:
-            try:
-                while True:
-                    ready, _, _ = select.select([master_fd], [], [], 0.1)
-                    if master_fd in ready:
-                        data = os.read(master_fd, 1024)
-                        if not data:
-                            if process.poll() is not None:
-                                break
-                            continue
-                        sys.stdout.buffer.write(data)
-                        sys.stdout.flush()
-                        log_file.write(data)
-                        log_file.flush()
-                    elif process.poll() is not None:
-                        break
-            finally:
-                os.close(master_fd)
-        return_code = process.wait()
-    else:
-        with log_path.open("w", encoding="utf-8") as log_file:
-            process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                cwd=str(cwd),
-                env=env,
-                bufsize=1,
-            )
-            assert process.stdout is not None
-            for line in process.stdout:
-                log_file.write(line)
-                console.print(line.rstrip())
-            return_code = process.wait()
-    if return_code != 0:
-        console.print(f"[bold red]Command failed with code {return_code}[/]")
-    return return_code
-
-
-def prepare_environment(
-    *,
-    config: dict[str, Any],
-    model_cfg: dict[str, Any],
-    run_dir: Path,
-    training: bool,
-) -> dict[str, str]:
-    env = os.environ.copy()
-    env["PYTHONPATH"] = f"{REPO_ROOT}:{env.get('PYTHONPATH', '')}" if env.get("PYTHONPATH") else str(REPO_ROOT)
-    env["DD_OUTPUT_DIR"] = str(run_dir)
-
-    if "seed" in config:
-        env["DD_SEED"] = str(config["seed"])
-
-    device = config.get("device")
-    if device:
-        env["DD_DEVICE"] = str(device)
-
-    data_cfg = config.get("data", {})
-    data_root = data_cfg.get("root")
-    if data_root:
-        env["DD_DATA_ROOT"] = str(Path(data_root).expanduser().resolve())
-    if "train_split" in data_cfg:
-        env["DD_TRAIN_SPLIT"] = str(data_cfg["train_split"])
-    if "val_split" in data_cfg:
-        env["DD_VAL_SPLIT"] = str(data_cfg["val_split"])
-
-    num_classes = model_cfg.get("num_classes", data_cfg.get("num_classes"))
-    if num_classes is not None:
-        env["DD_NUM_CLASSES"] = str(num_classes)
-    if "img_size" in data_cfg:
-        env["DD_IMG_SIZE"] = str(data_cfg["img_size"])
-
-    if training:
-        train_cfg = model_cfg.get("training", {})
-        if "batch_size" in train_cfg:
-            env["DD_BATCH_SIZE"] = str(train_cfg["batch_size"])
-        if "epochs" in train_cfg:
-            env["DD_EPOCHS"] = str(train_cfg["epochs"])
-        if "num_workers" in train_cfg:
-            env["DD_NUM_WORKERS"] = str(train_cfg["num_workers"])
-        resume = str(train_cfg.get("resume", "")).lower()
-        env["DD_RESUME_AUTO"] = "1" if resume in {"1", "true", "auto"} else "0"
-    else:
-        infer_cfg = model_cfg.get("inference", {})
-        if "batch_size" in infer_cfg:
-            env["DD_BATCH_SIZE"] = str(infer_cfg["batch_size"])
-        if "num_workers" in infer_cfg:
-            env["DD_NUM_WORKERS"] = str(infer_cfg["num_workers"])
-
-    return env
-
-
-def snapshot_config(run_dir: Path, *, config: dict[str, Any], model_cfg: dict[str, Any]) -> None:
+def snapshot_config(run_paths: RunPaths, *, config: dict[str, Any], model_cfg: dict[str, Any]) -> None:
     snapshot = {
         "timestamp": datetime.now().isoformat(),
         "global": {
@@ -170,49 +123,293 @@ def snapshot_config(run_dir: Path, *, config: dict[str, Any], model_cfg: dict[st
         },
         "model": model_cfg,
     }
-    with (run_dir / "config_snapshot.yaml").open("w", encoding="utf-8") as handle:
+    with (run_paths.run_dir / "config_snapshot.yaml").open("w", encoding="utf-8") as handle:
         yaml.safe_dump(snapshot, handle)
 
 
-def run_training(config: dict[str, Any], model_cfg: dict[str, Any], run_dir: Path) -> None:
-    spec = get_model_spec(model_cfg["name"])
-    env = prepare_environment(config=config, model_cfg=model_cfg, run_dir=run_dir, training=True)
-    cmd = [sys.executable, str((REPO_ROOT / spec.train_script).resolve())]
-    log_path = run_dir / "logs" / "train.log"
-    return_code = stream_subprocess(cmd, env=env, cwd=run_dir, log_path=log_path)
-    if return_code != 0:
-        raise SystemExit(return_code)
-
-
-def run_inference(
+def build_env_overrides(
+    *,
     config: dict[str, Any],
     model_cfg: dict[str, Any],
-    run_dir: Path,
+    run_paths: RunPaths,
+    training: bool,
+) -> dict[str, str]:
+    data_cfg = config.get("data", {})
+    overrides: dict[str, str] = {
+        "DD_OUTPUT_DIR": str(run_paths.run_dir),
+    }
+
+    seed = config.get("seed")
+    if seed is not None:
+        overrides["DD_SEED"] = str(seed)
+
+    device = config.get("device")
+    if device:
+        overrides["DD_DEVICE"] = str(device)
+
+    data_root = data_cfg.get("root")
+    if data_root:
+        overrides["DD_DATA_ROOT"] = str(Path(data_root).expanduser().resolve())
+    for key, env_key in (
+        ("train_split", "DD_TRAIN_SPLIT"),
+        ("val_split", "DD_VAL_SPLIT"),
+        ("test_split", "DD_TEST_SPLIT"),
+        ("img_size", "DD_IMG_SIZE"),
+        ("num_classes", "DD_NUM_CLASSES"),
+    ):
+        value = data_cfg.get(key)
+        if value is not None:
+            overrides[env_key] = str(value)
+
+    num_classes = model_cfg.get("num_classes")
+    if num_classes is not None:
+        overrides["DD_NUM_CLASSES"] = str(num_classes)
+
+    if training:
+        train_cfg = model_cfg.get("training", {})
+        if "batch_size" in train_cfg:
+            overrides["DD_BATCH_SIZE"] = str(train_cfg["batch_size"])
+        if "epochs" in train_cfg:
+            overrides["DD_EPOCHS"] = str(train_cfg["epochs"])
+        if "num_workers" in train_cfg:
+            overrides["DD_NUM_WORKERS"] = str(train_cfg["num_workers"])
+        resume_flag = str(train_cfg.get("resume", "")).lower()
+        overrides["DD_RESUME_AUTO"] = "1" if resume_flag in {"1", "true", "auto"} else "0"
+    else:
+        infer_cfg = model_cfg.get("inference", {})
+        if "batch_size" in infer_cfg:
+            overrides["DD_BATCH_SIZE"] = str(infer_cfg["batch_size"])
+        if "num_workers" in infer_cfg:
+            overrides["DD_NUM_WORKERS"] = str(infer_cfg["num_workers"])
+
+    return overrides
+
+
+def import_trainer(module_name: str) -> Any:
+    module = importlib.import_module(module_name)
+    if hasattr(module, "main"):
+        return module.main
+    msg = f"Trainer module '{module_name}' must expose a main() function."
+    raise AttributeError(msg)
+
+
+def run_training_job(config: dict[str, Any], model_cfg: dict[str, Any], run_paths: RunPaths) -> None:
+    spec = get_model_spec(model_cfg["name"])
+    overrides = build_env_overrides(config=config, model_cfg=model_cfg, run_paths=run_paths, training=True)
+    trainer_main = import_trainer(spec.train_module)
+
+    console.print(f"[bold]→ training {model_cfg['name']}[/]")
+    with patched_environ(overrides), tee_output(run_paths.logs / "train.log"):
+        trainer_main()
+
+
+def _ensure_rgb(image: Image.Image) -> Image.Image:
+    if image.mode != "RGB":
+        return image.convert("RGB")
+    return image
+
+
+def build_eval_transforms(image_size: int) -> transforms.Compose:
+    return transforms.Compose(
+        [
+            transforms.Lambda(_ensure_rgb),
+            transforms.Resize(image_size),
+            transforms.CenterCrop(image_size),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        ]
+    )
+
+
+def load_model(
+    model_name: str,
+    num_classes: int,
+    weights_path: Path | None,
+    device: torch.device,
+) -> nn.Module:
+    spec = get_model_spec(model_name)
+    model = spec.builder(model_name, num_classes)
+    model.to(device)
+    model.eval()
+
+    if weights_path is not None and weights_path.exists():
+        state = torch.load(weights_path, map_location=device)
+        if isinstance(state, dict) and "state_dict" in state:
+            state = state["state_dict"]
+        elif isinstance(state, dict) and "model" in state:
+            state = state["model"]
+        model.load_state_dict(state, strict=False)
+
+    return model
+
+
+def build_inference_loader(
+    *,
+    dataset: datasets.ImageFolder,
+    batch_size: int,
+    num_workers: int,
+) -> DataLoader:
+    kwargs: dict[str, Any] = {
+        "batch_size": batch_size,
+        "shuffle": False,
+        "num_workers": num_workers,
+        "pin_memory": True,
+        "persistent_workers": num_workers > 0,
+    }
+    if num_workers > 0:
+        kwargs["prefetch_factor"] = 2
+    return DataLoader(dataset, **kwargs)
+
+
+def save_confusion_matrix(cm: np.ndarray, labels: list[str], path: Path) -> None:
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=labels)
+    fig, ax = plt.subplots(figsize=(6, 5))
+    disp.plot(ax=ax, cmap="Blues", colorbar=False)
+    fig.tight_layout()
+    fig.savefig(path)
+    plt.close(fig)
+
+
+def save_roc_curve(y_true: np.ndarray, y_scores: np.ndarray, path: Path) -> None:
+    from sklearn.metrics import RocCurveDisplay
+
+    fig, ax = plt.subplots(figsize=(6, 5))
+    RocCurveDisplay.from_predictions(y_true, y_scores, ax=ax)
+    ax.set_title("ROC Curve")
+    fig.tight_layout()
+    fig.savefig(path)
+    plt.close(fig)
+
+
+def run_inference_job(
+    *,
     config_path: Path,
+    config: dict[str, Any],
+    model_cfg: dict[str, Any],
+    run_paths: RunPaths,
 ) -> None:
-    env = prepare_environment(config=config, model_cfg=model_cfg, run_dir=run_dir, training=False)
-    cmd = [
-        sys.executable,
-        str((REPO_ROOT / "inference_cli.py").resolve()),
-        "--config",
-        str(config_path),
-        "--model-name",
-        model_cfg["name"],
-        "--run-dir",
-        str(run_dir),
-    ]
-    log_path = run_dir / "logs" / "inference.log"
-    return_code = stream_subprocess(cmd, env=env, cwd=run_dir, log_path=log_path)
-    if return_code != 0:
-        raise SystemExit(return_code)
+    spec = get_model_spec(model_cfg["name"])
+    data_cfg = config.get("data", {})
+    infer_cfg = model_cfg.get("inference", {})
+
+    num_classes = int(model_cfg.get("num_classes", data_cfg.get("num_classes", 2)))
+    image_size = int(infer_cfg.get("img_size", data_cfg.get("img_size", spec.default_image_size)))
+    batch_size = int(infer_cfg.get("batch_size", 64))
+    num_workers = int(infer_cfg.get("num_workers", 4))
+
+    device_str = config.get("device", "cuda")
+    if device_str.startswith("cuda") and not torch.cuda.is_available():
+        console.print("[bold yellow]⚠️  CUDA requested but unavailable[/]: using CPU")
+        device_str = "cpu"
+    device = torch.device(device_str)
+
+    weights_path_value = infer_cfg.get("weights")
+    weights_path: Path | None = None
+    if weights_path_value:
+        weights_path = Path(weights_path_value)
+        if not weights_path.is_absolute():
+            weights_path = (config_path.parent / weights_path).resolve()
+
+    model = load_model(model_cfg["name"], num_classes, weights_path, device)
+    transforms_eval = build_eval_transforms(image_size)
+
+    data_root_value = data_cfg.get("root", "data/DeepFakeFrames")
+    data_root = Path(data_root_value).expanduser()
+    if not data_root.is_absolute():
+        data_root = (config_path.parent / data_root).resolve()
+
+    split = infer_cfg.get("split", data_cfg.get("test_split", "test"))
+    dataset_path = data_root / split
+    if not dataset_path.exists():
+        console.print(f"[bold red]Split not found:[/] {dataset_path}")
+        raise SystemExit(1)
+
+    dataset = datasets.ImageFolder(dataset_path, transform=transforms_eval)
+    if len(dataset) == 0:
+        console.print(f"[bold yellow]No images found in[/] {dataset_path}")
+        return
+
+    dataloader = build_inference_loader(dataset=dataset, batch_size=batch_size, num_workers=num_workers)
+
+    progress = Progress(
+        TextColumn("[bold blue]{task.description}"),
+        BarColumn(bar_width=None),
+        MofNCompleteColumn(),
+        TimeElapsedColumn(),
+        TimeRemainingColumn(),
+        TextColumn("{task.fields[speed]}"),
+        console=console,
+    )
+
+    all_probs: list[torch.Tensor] = []
+    all_preds: list[torch.Tensor] = []
+    all_targets: list[torch.Tensor] = []
+
+    start = perf_counter()
+    images_seen = 0
+    with progress:
+        task = progress.add_task("inference", total=len(dataloader), speed="")
+        for images, targets in dataloader:
+            images = images.to(device, non_blocking=True)
+            with torch.inference_mode():
+                logits = model(images)
+                probs = torch.softmax(logits, dim=1)
+                preds = torch.argmax(probs, dim=1)
+            all_probs.append(probs.cpu())
+            all_preds.append(preds.cpu())
+            all_targets.append(targets.cpu())
+            images_seen += targets.size(0)
+            elapsed = perf_counter() - start
+            speed = images_seen / max(elapsed, 1e-6)
+            progress.update(task, advance=1, speed=f"{speed:.1f} img/s")
+
+    probs_tensor = torch.cat(all_probs, dim=0)
+    preds_tensor = torch.cat(all_preds, dim=0)
+    targets_tensor = torch.cat(all_targets, dim=0)
+
+    accuracy = (preds_tensor == targets_tensor).float().mean().item()
+    metrics: dict[str, Any] = {
+        "model": model_cfg["name"],
+        "split": split,
+        "accuracy": accuracy,
+        "timestamp": datetime.now().isoformat(),
+    }
+
+    unique_targets = torch.unique(targets_tensor)
+    if unique_targets.numel() > 1:
+        try:
+            if num_classes == 2:
+                roc_auc = roc_auc_score(targets_tensor.numpy(), probs_tensor[:, 1].numpy())
+            else:
+                roc_auc = roc_auc_score(targets_tensor.numpy(), probs_tensor.numpy(), multi_class="ovr")
+            metrics["roc_auc"] = float(roc_auc)
+        except ValueError:
+            pass
+
+    cm = confusion_matrix(targets_tensor.numpy(), preds_tensor.numpy())
+    metrics["confusion_matrix"] = cm.tolist()
+    save_confusion_matrix(cm, dataset.classes, run_paths.plots / "confusion_matrix.png")
+    if num_classes == 2 and unique_targets.numel() > 1:
+        save_roc_curve(targets_tensor.numpy(), probs_tensor[:, 1].numpy(), run_paths.plots / "roc_curve.png")
+
+    metrics_path = run_paths.logs / "metrics.jsonl"
+    with metrics_path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(metrics) + "\n")
+
+    console.print(
+        "[bold]Accuracy[/]: "
+        f"{accuracy:.4f}"
+        + " "
+        + " ".join(
+            f"{k}={v:.4f}" for k, v in metrics.items() if isinstance(v, float) and k != "accuracy"
+        )
+    )
 
 
 def orchestrate(config_path: Path, *, mode: str) -> None:
     config = load_config(config_path)
-
     seed = config.get("seed")
-    if seed is not None:
-        set_global_seed(int(seed))
+    apply_seed(seed)
 
     models_cfg = config.get("models", {})
     if not isinstance(models_cfg, dict):
@@ -232,27 +429,25 @@ def orchestrate(config_path: Path, *, mode: str) -> None:
         model_cfg = {"name": model_name, **base_cfg}
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         base_output = Path(model_cfg.get("output_dir", f"runs/{model_name}"))
-        run_dir = ensure_run_dir(base_output, timestamp)
-        snapshot_config(run_dir, config=config, model_cfg=model_cfg)
-        console.print(f"[bold]Model[/]: {model_name} → run dir {run_dir}")
+        run_paths = ensure_run_dirs(base_output, timestamp)
+        snapshot_config(run_paths, config=config, model_cfg=model_cfg)
 
         if mode == "training":
-            run_training(config, model_cfg, run_dir)
+            run_training_job(config, model_cfg, run_paths)
         elif mode == "inference":
-            run_inference(config, model_cfg, run_dir, config_path)
+            run_inference_job(config_path=config_path, config=config, model_cfg=model_cfg, run_paths=run_paths)
         else:
             raise ValueError(f"Unknown mode '{mode}'")
 
 
-def main() -> None:
+def run_cli() -> None:
     parser = argparse.ArgumentParser(description="DeepfakeDetection orchestrator")
     parser.add_argument("--mode", choices=["training", "inference"], default="training")
     parser.add_argument("--config", type=Path)
     args = parser.parse_args()
 
-    if args.config is not None:
-        config_path = args.config
-    else:
+    config_path = args.config
+    if config_path is None:
         default = "config/train.yaml" if args.mode == "training" else "config/inference.yaml"
         config_path = Path(default)
 
@@ -260,4 +455,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    run_cli()

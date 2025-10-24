@@ -23,7 +23,7 @@ class ModelSpec:
     """Metadata required to orchestrate training and inference."""
 
     name: str
-    train_script: str
+    train_module: str
     weights_key: str
     default_image_size: int
     builder: Callable[[str, int], nn.Module]
@@ -50,7 +50,7 @@ def _build_fastervit(model_name: str, num_classes: int) -> nn.Module:
 _EXACT_SPECS: dict[str, ModelSpec] = {
     "efficientnet_b3": ModelSpec(
         name="efficientnet_b3",
-        train_script="trainers/efficientnet.py",
+        train_module="trainers.efficientnet",
         weights_key="efficientnet_b3",
         default_image_size=224,
         builder=_build_efficientnet,
@@ -60,14 +60,14 @@ _EXACT_SPECS: dict[str, ModelSpec] = {
 _PREFIX_SPECS: dict[str, ModelSpec] = {
     "efficientformer": ModelSpec(
         name="efficientformer_v2_s1",
-        train_script="trainers/efficientformer_v2.py",
+        train_module="trainers.efficientformer_v2",
         weights_key="efficientformer_v2_s1",
         default_image_size=224,
         builder=_build_efficientformer,
     ),
     "faster_vit": ModelSpec(
         name="faster_vit_2_224",
-        train_script="trainers/fastervit.py",
+        train_module="trainers.fastervit",
         weights_key="faster_vit_2_224",
         default_image_size=224,
         builder=_build_fastervit,
