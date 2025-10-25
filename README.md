@@ -66,3 +66,38 @@ To set up the project, follow these steps:
    Install with:
    ```bash
    pip install -r requirements.txt
+```
+
+## Orchestrating runs (training & inference)
+
+You can use the  `train.py` and `inference.py` wrappers to drive
+experiments without touching per-model scripts under `/trainers/`. 
+Both of these files route through `orchestrator.py`, which reads
+`config/train.yaml` for training and `config/inference.yaml` for
+evaluation. Each config lists all supported backbones under `models:`
+and enables a subset via the `selection:` array.
+
+1. **Train models listed in `config/train.yaml`:**
+   ```bash
+   python train.py
+   ```
+2. **Evaluate models defined in `config/inference.yaml`:**
+   ```bash
+   python inference.py
+   ```
+
+Pass `--config` to either script to point at an alternate YAML file (for
+example, a copy with MNIST-specific hyperparameters) while keeping the
+same structure.
+
+Each run directory contains `checkpoints/` (latest & best checkpoints),
+`logs/` (console outputs), and `plots/` (confusion
+matrix and ROC curve when labels are available). The setup targets
+frame-level deepfake vs. real classification but works for multiclass
+ImageFolder datasets as well.
+
+### Per-model transform toggles
+
+Every transform in the training and evaluation pipelines can be toggled on
+or off per backbone. Add a `transforms:` block under each `models.<name>`
+entry in the YAML config and enable the transforms you need for training/inference for each model.
