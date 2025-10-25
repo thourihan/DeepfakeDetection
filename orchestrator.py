@@ -211,6 +211,9 @@ def build_env_overrides(
             overrides["DD_EPOCHS"] = str(train_cfg["epochs"])
         if "num_workers" in train_cfg:
             overrides["DD_NUM_WORKERS"] = str(train_cfg["num_workers"])
+        img_override = train_cfg.get("img_size")
+        if img_override is not None:
+            overrides["DD_IMG_SIZE"] = str(img_override)
         resume_flag = str(train_cfg.get("resume", "")).lower()
         overrides["DD_RESUME_AUTO"] = "1" if resume_flag in {"1", "true", "auto"} else "0"
     else:
@@ -219,7 +222,9 @@ def build_env_overrides(
             overrides["DD_BATCH_SIZE"] = str(infer_cfg["batch_size"])
         if "num_workers" in infer_cfg:
             overrides["DD_NUM_WORKERS"] = str(infer_cfg["num_workers"])
-
+        img_override = train_cfg.get("img_size")
+        if img_override is not None:
+            overrides["DD_IMG_SIZE"] = str(img_override)
     phase_key = "train" if training else "eval"
     transform_overrides = resolve_transform_mapping(model_cfg, phase=phase_key)
     if transform_overrides:

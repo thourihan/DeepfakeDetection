@@ -319,7 +319,7 @@ def main() -> None:  # noqa: PLR0915
         f"bs={batch_size} | steps/epoch={len(train_dl)}",
     )
 
-    model = timm.create_model(MODEL_NAME, pretrained=True, num_classes=num_classes)
+    model = timm.create_model(MODEL_NAME, pretrained=True, num_classes=num_classes, img_size=img_size)
     model.to(memory_format=torch.channels_last)
     model = model.to(device)
 
