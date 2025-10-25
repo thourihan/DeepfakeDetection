@@ -70,9 +70,9 @@ To set up the project, follow these steps:
 
 ## Orchestrating runs (training & inference)
 
-Use the thin `train.py` and `inference.py` wrappers to drive
-experiments without touching per-model scripts. They both route through
-`orchestrator.py`, which reads phase-specific YAML configs—
+You can use the  `train.py` and `inference.py` wrappers to drive
+experiments without touching per-model scripts under `/trainers/`. 
+Both of these files route through `orchestrator.py`, which reads
 `config/train.yaml` for training and `config/inference.yaml` for
 evaluation. Each config lists all supported backbones under `models:`
 and enables a subset via the `selection:` array.
@@ -90,37 +90,14 @@ Pass `--config` to either script to point at an alternate YAML file (for
 example, a copy with MNIST-specific hyperparameters) while keeping the
 same structure.
 
-> **Important:** keep `data.num_classes` aligned with the number of
-> folders/classes in your ImageFolder splits (e.g., set it to `10` for
-> MNIST). The trainers validate this before launching to avoid hard-to-
-> debug CUDA assertions when the head dimension disagrees with the
-> labels provided by the dataset.
-
 Each run directory contains `checkpoints/` (latest & best checkpoints),
-`logs/` (console output plus JSONL metrics), and `plots/` (confusion
+`logs/` (console outputs), and `plots/` (confusion
 matrix and ROC curve when labels are available). The setup targets
 frame-level deepfake vs. real classification but works for multiclass
-ImageFolder datasets as well (e.g., MNIST variants converted to RGB).
+ImageFolder datasets as well.
 
 ### Per-model transform toggles
 
 Every transform in the training and evaluation pipelines can be toggled on
 or off per backbone. Add a `transforms:` block under each `models.<name>`
-entry in the YAML config and set the boolean switches you need:
-
-```yaml
-models:
-  efficientnet_b3:
-    transforms:
-      train:
-        train_random_resized_crop: true
-        train_random_erasing: false  # disable heavy augmentations for MNIST
-      eval:
-        val_center_crop: false       # skip center crop, keep resize only
-```
-
-Unspecified keys fall back to sensible defaults (matching the original
-pipelines). The orchestrator forwards the selected toggles to the trainer via
-environment variables, so you can keep the YAML concise and share the same
-model code for laptop-friendly MNIST experiments and augmentation-heavy
-deepfake datasets.
+entry in the YAML config and enable the transforms you need for training/inference for each model.
