@@ -66,7 +66,7 @@ To set up the project, follow these steps:
    Install with:
    ```bash
    pip install -r requirements.txt
-```
+    ```
 
 ## Orchestrating runs (training & inference)
 
