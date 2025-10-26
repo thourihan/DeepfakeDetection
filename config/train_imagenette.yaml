@@ -1,0 +1,85 @@
+seed: 1
+device: cuda
+
+data:
+  root: data/imagenette2-160
+  train_split: train
+  val_split: val
+  num_classes: 10
+  img_size: 160
+
+models:
+  efficientnet_b3:
+    output_dir: runs/efficientnet_b3_imagenette
+    transforms:
+      train:
+        ensure_rgb: true
+        train_resize: false
+        train_random_crop: false
+        train_center_crop: false
+        train_random_resized_crop: true
+        train_random_horizontal_flip: true
+        train_random_rotation: false
+        train_color_jitter: false
+        train_random_erasing: false
+      eval:
+        ensure_rgb: true
+        val_resize: true
+        val_center_crop: true
+    training:
+      epochs: 2
+      batch_size: 128
+      num_workers: 8
+      resume: auto
+
+  efficientformerv2_s1:
+    output_dir: runs/efficientformerv2_s1_imagenette
+    transforms:
+      train:
+        ensure_rgb: true
+        train_resize: true
+        train_random_resized_crop: false
+        train_random_crop: false
+        train_center_crop: true
+        train_random_horizontal_flip: true
+        train_random_rotation: false
+        train_color_jitter: false
+        train_random_erasing: false
+      eval:
+        ensure_rgb: true
+        val_resize: true
+        val_center_crop: true
+    training:
+      epochs: 2
+      batch_size: 192
+      num_workers: 4
+      resume: false
+      img_size: 224
+
+  faster_vit_2_224:
+    output_dir: runs/faster_vit_2_224_imagenette
+    transforms:
+      train:
+        ensure_rgb: true
+        train_resize: true
+        train_random_resized_crop: false
+        train_random_crop: false
+        train_center_crop: true
+        train_random_horizontal_flip: true
+        train_random_rotation: false
+        train_color_jitter: false
+      eval:
+        ensure_rgb: true
+        val_resize: true
+        val_center_crop: true
+    training:
+      epochs: 2
+      batch_size: 128
+      num_workers: 8
+      resume: auto
+      img_size: 224
+
+selection:
+  - efficientnet_b3
+  - efficientformerv2_s1
+  - faster_vit_2_224
