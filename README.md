@@ -16,7 +16,7 @@ Check out the research paper [here](https://docs.google.com/document/d/1Duh0sKFx
 - **Multiple Backbones (via timm):** EfficientNet, FasterViT, and EfficientFormerV2-S1 for complementary accuracy/latency trade-offs.
 - **Gradio Interface:** Simple web UI for uploading images and viewing model predictions.
 - **Grad-CAM Visualization:** Heatmaps highlighting the regions driving model decisions (available across models).
-- **Training & Evaluation Scripts:** Ssripts for training and evaluation with Grad-CAM oututs. 
+- **Training & Evaluation Scripts:** Scripts for training and evaluation with Grad-CAM oututs. 
 
 ## Sample Predictions and Heatmap Visualizations
 Here are a couple of examples of the model's output, along with heatmap visualizations for each.
