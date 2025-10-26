@@ -1,8 +1,8 @@
-seed: 1337
+seed: 1
 device: cuda
 
 data:
-  root: data/deepfake_dataset
+  root: data/mini_deepfake_dataset
   train_split: train
   val_split: val
   num_classes: 2
@@ -24,12 +24,12 @@ models:
         val_resize: true
         val_center_crop: true
     training:
-      epochs: 10
+      epochs: 5
       batch_size: 64
       num_workers: 4
       resume: auto
-  efficientformer_v2_s1:
-    output_dir: runs/efficientformer_v2_s1
+  efficientformerv2_s1:
+    output_dir: runs/efficientformerv2_s1
     transforms:
       train:
         ensure_rgb: true
@@ -41,7 +41,7 @@ models:
         val_resize: true
         val_center_crop: true
     training:
-      epochs: 12
+      epochs: 5
       batch_size: 128
       num_workers: 8
       resume: auto
@@ -58,12 +58,12 @@ models:
         val_resize: true
         val_center_crop: true
     training:
-      epochs: 12
+      epochs: 5
       batch_size: 64
       num_workers: 8
       resume: auto
 
 selection:
   - efficientnet_b3
-  - efficientformer_v2_s1
+  - efficientformerv2_s1
   - faster_vit_2_224

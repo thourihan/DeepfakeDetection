@@ -405,10 +405,10 @@ def _run_inference_job(
     eval_toggles = resolve_transform_mapping(model_cfg, phase="eval")
     transforms_eval = build_eval_transforms(image_size, toggles=eval_toggles)
 
-    data_root_value = data_cfg.get("root", "data/DeepFakeFrames")
+    data_root_value = data_cfg.get("root")
     data_root = Path(data_root_value).expanduser()
     if not data_root.is_absolute():
-        data_root = (config_path.parent / data_root).resolve()
+        data_root = (Path.cwd() / data_root).resolve()
 
     split = split_name
     dataset_path = data_root / split

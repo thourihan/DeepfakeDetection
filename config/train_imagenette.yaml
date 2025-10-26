@@ -32,8 +32,8 @@ models:
       num_workers: 8
       resume: auto
 
-  efficientformer_v2_s1:
-    output_dir: runs/efficientformer_v2_s1_imagenette
+  efficientformerv2_s1:
+    output_dir: runs/efficientformerv2_s1_imagenette
     transforms:
       train:
         ensure_rgb: true
@@ -81,5 +81,5 @@ models:
 
 selection:
   - efficientnet_b3
-  - efficientformer_v2_s1
+  - efficientformerv2_s1
   - faster_vit_2_224

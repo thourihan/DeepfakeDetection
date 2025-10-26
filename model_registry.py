@@ -59,9 +59,9 @@ _EXACT_SPECS: dict[str, ModelSpec] = {
 
 _PREFIX_SPECS: dict[str, ModelSpec] = {
     "efficientformer": ModelSpec(
-        name="efficientformer_v2_s1",
+        name="efficientformerv2_s1",
         train_module="trainers.efficientformer_v2",
-        weights_key="efficientformer_v2_s1",
+        weights_key="efficientformerv2_s1",
         default_image_size=224,
         builder=_build_efficientformer,
     ),
@@ -81,7 +81,7 @@ def get_model_spec(model_name: str) -> ModelSpec:
     The registry keeps the layer thin: it knows where to find the training
     script and how to build the architecture so we can load weights for
     inference. It supports both exact model names (e.g., ``efficientnet_b3``)
-    and prefix matches like ``efficientformer_v2_s1`` or ``faster_vit_2_224``.
+    and prefix matches like ``efficientformerv2_s1`` or ``faster_vit_2_224``.
     """
 
     if model_name in _EXACT_SPECS:

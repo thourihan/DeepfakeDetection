@@ -1,8 +1,8 @@
-seed: 1337
+seed: 1
 device: cuda
 
 data:
-  root: data/deepfake_dataset
+  root: data/mini_deepfake_dataset
   test_split: test
   num_classes: 2
   img_size: 224
@@ -20,8 +20,8 @@ models:
       split: test
       batch_size: 256
       num_workers: 2
-  efficientformer_v2_s1:
-    output_dir: runs/efficientformer_v2_s1
+  efficientformerv2_s1:
+    output_dir: runs/efficientformerv2_s1
     transforms:
       eval:
         ensure_rgb: true
@@ -47,5 +47,5 @@ models:
 
 selection:
   - efficientnet_b3
-  - efficientformer_v2_s1
+  - efficientformerv2_s1
   - faster_vit_2_224
