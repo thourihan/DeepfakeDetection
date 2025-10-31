@@ -128,33 +128,36 @@ def ensure_run_dirs(base: Path, timestamp: str) -> RunPaths:
     return RunPaths(run_dir=run_dir, checkpoints=checkpoints, logs=logs, plots=plots)
 
 
-def snapshot_config(run_paths: RunPaths, *, config: dict[str, Any], model_cfg: dict[str, Any]) -> None:
+def snapshot_config(
+    run_paths: RunPaths, *, config: dict[str, Any], model_cfg: dict[str, Any]
+) -> None:
     snapshot = {
         "timestamp": datetime.now().isoformat(),
-        "global": {
-            k: v
-            for k, v in config.items()
-            if k not in {"models", "selection"}
-        },
+        "global": {k: v for k, v in config.items() if k not in {"models", "selection"}},
         "model": model_cfg,
     }
-    with (run_paths.run_dir / "config_snapshot.yaml").open("w", encoding="utf-8") as handle:
+    with (run_paths.run_dir / "config_snapshot.yaml").open(
+        "w", encoding="utf-8"
+    ) as handle:
         yaml.safe_dump(snapshot, handle)
 
 
-def resolve_transform_mapping(model_cfg: dict[str, Any], *, phase: str) -> dict[str, Any] | None:
+def resolve_transform_mapping(
+    model_cfg: dict[str, Any], *, phase: str
+) -> dict[str, Any] | None:
     """Return a mapping of transform toggles for ``phase`` if configured."""
     transforms_cfg = model_cfg.get("transforms")
     if isinstance(transforms_cfg, dict):
         phase_cfg = transforms_cfg.get(phase)
         if isinstance(phase_cfg, dict):
             return phase_cfg
-        if all(isinstance(v, bool | int | float | str) for v in transforms_cfg.values()):
+        if all(
+            isinstance(v, bool | int | float | str) for v in transforms_cfg.values()
+        ):
             return transforms_cfg
-    if phase == "train":
-        scoped = model_cfg.get("training", {}).get("transforms")
-    else:
-        scoped = model_cfg.get("inference", {}).get("transforms")
+    scoped = model_cfg.get("training" if phase == "train" else "inference", {}).get(
+        "transforms"
+    )
     if isinstance(scoped, dict):
         return scoped
     return None
@@ -168,9 +171,7 @@ def build_env_overrides(
     training: bool,
 ) -> dict[str, str]:
     data_cfg = config.get("data", {})
-    overrides: dict[str, str] = {
-        "DD_OUTPUT_DIR": str(run_paths.run_dir),
-    }
+    overrides: dict[str, str] = {"DD_OUTPUT_DIR": str(run_paths.run_dir)}
 
     seed = config.get("seed")
     if seed is not None:
@@ -210,7 +211,9 @@ def build_env_overrides(
         if img_override is not None:
             overrides["DD_IMG_SIZE"] = str(img_override)
         resume_flag = str(train_cfg.get("resume", "")).lower()
-        overrides["DD_RESUME_AUTO"] = "1" if resume_flag in {"1", "true", "auto"} else "0"
+        overrides["DD_RESUME_AUTO"] = (
+            "1" if resume_flag in {"1", "true", "auto"} else "0"
+        )
     else:
         infer_cfg = model_cfg.get("inference", {})
         if "batch_size" in infer_cfg:
@@ -237,13 +240,16 @@ def import_trainer(module_name: str) -> Any:
     raise AttributeError(msg)
 
 
-def run_training_job(config: dict[str, Any], model_cfg: dict[str, Any], run_paths: RunPaths) -> None:
+def run_training_job(
+    config: dict[str, Any], model_cfg: dict[str, Any], run_paths: RunPaths
+) -> None:
     spec = get_model_spec(model_cfg["name"])
-    overrides = build_env_overrides(config=config, model_cfg=model_cfg, run_paths=run_paths, training=True)
+    overrides = build_env_overrides(
+        config=config, model_cfg=model_cfg, run_paths=run_paths, training=True
+    )
     log_path = run_paths.logs / "train.log"
     log_path.unlink(missing_ok=True)
     overrides["DD_LOG_PATH"] = str(log_path)
-
     console.print(f"[bold]→ training {model_cfg['name']}[/]")
     with patched_environ(overrides):
         trainer_main = import_trainer(spec.train_module)
@@ -283,7 +289,9 @@ def build_eval_transforms(
     if resolved.get("val_to_tensor", True):
         ops.append(transforms.ToTensor())
     if resolved.get("val_normalize", True):
-        ops.append(transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]))
+        ops.append(
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        )
 
     return transforms.Compose(ops)
 
@@ -303,7 +311,6 @@ def load_model(
         if not weights_path.exists():
             console.print(f"[bold red]Weights not found:[/] {weights_path}")
             raise SystemExit(1)
-
         size_bytes = weights_path.stat().st_size
         size_mib = size_bytes / (1024**2)
         console.print(
@@ -367,9 +374,13 @@ def run_inference_job(
     console.print(f"[bold]→ inference {model_cfg['name']}[/]")
     log_path = run_paths.logs / "inference.log"
     log_path.unlink(missing_ok=True)
-
     with tee_output(log_path):
-        _run_inference_job(config_path=config_path, config=config, model_cfg=model_cfg, run_paths=run_paths)
+        _run_inference_job(
+            config_path=config_path,
+            config=config,
+            model_cfg=model_cfg,
+            run_paths=run_paths,
+        )
 
 
 def _run_inference_job(
@@ -379,23 +390,30 @@ def _run_inference_job(
     model_cfg: dict[str, Any],
     run_paths: RunPaths,
 ) -> None:
-    local_console = Console(file=sys.stdout, force_terminal=bool(getattr(sys.stdout, "isatty", lambda: False)()))
+    local_console = Console(
+        file=sys.stdout,
+        force_terminal=bool(getattr(sys.stdout, "isatty", lambda: False)()),
+    )
     spec = get_model_spec(model_cfg["name"])
     data_cfg = config.get("data", {})
     infer_cfg = model_cfg.get("inference", {})
     split_name = infer_cfg.get("split", data_cfg.get("test_split", "test"))
     local_console.print(
-        f"[bold]Model[/]: {model_cfg['name']} | split={split_name} | batch={infer_cfg.get('batch_size', 64)}",
+        f"[bold]Model[/]: {model_cfg['name']} | split={split_name} | batch={infer_cfg.get('batch_size', 64)}"
     )
 
     num_classes = int(model_cfg.get("num_classes", data_cfg.get("num_classes", 2)))
-    image_size = int(infer_cfg.get("img_size", data_cfg.get("img_size", spec.default_image_size)))
+    image_size = int(
+        infer_cfg.get("img_size", data_cfg.get("img_size", spec.default_image_size))
+    )
     batch_size = int(infer_cfg.get("batch_size", 64))
     num_workers = int(infer_cfg.get("num_workers", 4))
 
     device_str = config.get("device", "cuda")
     if device_str.startswith("cuda") and not torch.cuda.is_available():
-        local_console.print("[bold yellow]⚠️  CUDA requested but unavailable[/]: using CPU")
+        local_console.print(
+            "[bold yellow]⚠️  CUDA requested but unavailable[/]: using CPU"
+        )
         device_str = "cpu"
     device = torch.device(device_str)
 
@@ -405,6 +423,32 @@ def _run_inference_job(
         weights_path = Path(weights_path_value).expanduser()
         if not weights_path.is_absolute():
             weights_path = (Path.cwd() / weights_path).resolve()
+        if not weights_path.exists():
+            ans = (
+                input(
+                    f"Missing weights at '{weights_path}'. Download from GitHub Releases? [Y/N]: "
+                )
+                .strip()
+                .lower()
+            )
+            if ans in {"Y", "y"}:
+                url_base = "https://github.com/thourihan/DeepfakeDetection/releases/download/v0.2.0/"
+                name_map = {
+                    "efficientnet_b3": "EfficientNet_10_21_2025.pth",
+                    "efficientformerv2_s1": "EfficientFormerV2_S1.pth",
+                    "faster_vit_2_224": "FasterVit_10_20_2025.pth",
+                }
+                if model_cfg["name"] in name_map:
+                    weights_path.parent.mkdir(parents=True, exist_ok=True)
+                    import urllib.request
+
+                    urllib.request.urlretrieve(
+                        url_base + name_map[model_cfg["name"]], str(weights_path)
+                    )
+                else:
+                    local_console.print(
+                        "[bold yellow]No download URL mapped for this model.[/]"
+                    )
 
     model = load_model(model_cfg["name"], num_classes, weights_path, device)
     eval_toggles = resolve_transform_mapping(model_cfg, phase="eval")
@@ -426,7 +470,9 @@ def _run_inference_job(
         local_console.print(f"[bold yellow]No images found in[/] {dataset_path}")
         return
 
-    dataloader = build_inference_loader(dataset=dataset, batch_size=batch_size, num_workers=num_workers)
+    dataloader = build_inference_loader(
+        dataset=dataset, batch_size=batch_size, num_workers=num_workers
+    )
 
     progress = Progress(
         TextColumn("[bold blue]{task.description}"),
@@ -476,9 +522,13 @@ def _run_inference_job(
     if unique_targets.numel() > 1:
         try:
             if num_classes == 2:
-                roc_auc = roc_auc_score(targets_tensor.numpy(), probs_tensor[:, 1].numpy())
+                roc_auc = roc_auc_score(
+                    targets_tensor.numpy(), probs_tensor[:, 1].numpy()
+                )
             else:
-                roc_auc = roc_auc_score(targets_tensor.numpy(), probs_tensor.numpy(), multi_class="ovr")
+                roc_auc = roc_auc_score(
+                    targets_tensor.numpy(), probs_tensor.numpy(), multi_class="ovr"
+                )
             metrics["roc_auc"] = float(roc_auc)
         except ValueError:
             pass
@@ -487,7 +537,11 @@ def _run_inference_job(
     metrics["confusion_matrix"] = cm.tolist()
     save_confusion_matrix(cm, dataset.classes, run_paths.plots / "confusion_matrix.png")
     if num_classes == 2 and unique_targets.numel() > 1:
-        save_roc_curve(targets_tensor.numpy(), probs_tensor[:, 1].numpy(), run_paths.plots / "roc_curve.png")
+        save_roc_curve(
+            targets_tensor.numpy(),
+            probs_tensor[:, 1].numpy(),
+            run_paths.plots / "roc_curve.png",
+        )
 
     metrics_path = run_paths.logs / "metrics.jsonl"
     with metrics_path.open("a", encoding="utf-8") as handle:
@@ -498,7 +552,9 @@ def _run_inference_job(
         f"{accuracy:.4f}"
         + " "
         + " ".join(
-            f"{k}={v:.4f}" for k, v in metrics.items() if isinstance(v, float) and k != "accuracy"
+            f"{k}={v:.4f}"
+            for k, v in metrics.items()
+            if isinstance(v, float) and k != "accuracy"
         )
     )
 
@@ -532,7 +588,12 @@ def orchestrate(config_path: Path, *, mode: str) -> None:
         if mode == "training":
             run_training_job(config, model_cfg, run_paths)
         elif mode == "inference":
-            run_inference_job(config_path=config_path, config=config, model_cfg=model_cfg, run_paths=run_paths)
+            run_inference_job(
+                config_path=config_path,
+                config=config,
+                model_cfg=model_cfg,
+                run_paths=run_paths,
+            )
         else:
             raise ValueError(f"Unknown mode '{mode}'")
 
@@ -545,7 +606,9 @@ def run_cli() -> None:
 
     config_path = args.config
     if config_path is None:
-        default = "config/train.yaml" if args.mode == "training" else "config/inference.yaml"
+        default = (
+            "config/train.yaml" if args.mode == "training" else "config/inference.yaml"
+        )
         config_path = Path(default)
 
     orchestrate(config_path.resolve(), mode=args.mode)
