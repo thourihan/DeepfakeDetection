@@ -1,4 +1,4 @@
-name: CI (lint + smoke)
+name: CI
 
 on:
   pull_request:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   lint:
-    name: Ruff lint
+    name: Lint (Ruff)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,7 +21,7 @@ jobs:
         run: ruff check .
 
   smoke:
-    name: Repo smoke test
+    name: Smoke Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
