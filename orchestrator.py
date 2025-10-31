@@ -30,7 +30,12 @@ from rich.progress import (
     TimeElapsedColumn,
     TimeRemainingColumn,
 )
-from sklearn.metrics import ConfusionMatrixDisplay, balanced_accuracy_score, confusion_matrix, roc_auc_score
+from sklearn.metrics import (
+    ConfusionMatrixDisplay,
+    balanced_accuracy_score,
+    confusion_matrix,
+    roc_auc_score,
+)
 from torch import nn
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
