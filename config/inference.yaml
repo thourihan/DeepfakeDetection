@@ -4,6 +4,7 @@ device: cuda
 data:
   root: data/mini_deepfake_dataset
   test_split: test
+  val_split: val
   num_classes: 2
   img_size: 224
 
@@ -40,7 +41,7 @@ models:
         val_resize: true
         val_center_crop: true
     inference:
-      weights: weights/FasterViT_2_224.pth
+      weights: weights/FasterViT_10_20_2025.pth
       split: test
       batch_size: 256
       num_workers: 4
