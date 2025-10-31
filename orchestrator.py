@@ -54,7 +54,6 @@ class RunPaths:
 @contextlib.contextmanager
 def patched_environ(overrides: dict[str, str]) -> Iterator[None]:
     """Temporarily set environment variables for a trainer."""
-
     original: dict[str, str | None] = {}
     for key, value in overrides.items():
         original[key] = os.environ.get(key)
@@ -72,7 +71,6 @@ def patched_environ(overrides: dict[str, str]) -> Iterator[None]:
 @contextlib.contextmanager
 def tee_output(log_path: Path) -> Iterator[None]:
     """Mirror stdout/stderr to both the console and a log file."""
-
     log_path.parent.mkdir(parents=True, exist_ok=True)
     with log_path.open("w", encoding="utf-8") as log_file:
         stdout, stderr = sys.stdout, sys.stderr
@@ -146,7 +144,6 @@ def snapshot_config(run_paths: RunPaths, *, config: dict[str, Any], model_cfg: d
 
 def resolve_transform_mapping(model_cfg: dict[str, Any], *, phase: str) -> dict[str, Any] | None:
     """Return a mapping of transform toggles for ``phase`` if configured."""
-
     transforms_cfg = model_cfg.get("transforms")
     if isinstance(transforms_cfg, dict):
         phase_cfg = transforms_cfg.get(phase)
@@ -154,14 +151,12 @@ def resolve_transform_mapping(model_cfg: dict[str, Any], *, phase: str) -> dict[
             return phase_cfg
         if all(isinstance(v, bool | int | float | str) for v in transforms_cfg.values()):
             return transforms_cfg
-
     if phase == "train":
         scoped = model_cfg.get("training", {}).get("transforms")
     else:
         scoped = model_cfg.get("inference", {}).get("transforms")
     if isinstance(scoped, dict):
         return scoped
-
     return None
 
 
@@ -222,9 +217,10 @@ def build_env_overrides(
             overrides["DD_BATCH_SIZE"] = str(infer_cfg["batch_size"])
         if "num_workers" in infer_cfg:
             overrides["DD_NUM_WORKERS"] = str(infer_cfg["num_workers"])
-        img_override = train_cfg.get("img_size")
+        img_override = infer_cfg.get("img_size")
         if img_override is not None:
             overrides["DD_IMG_SIZE"] = str(img_override)
+
     phase_key = "train" if training else "eval"
     transform_overrides = resolve_transform_mapping(model_cfg, phase=phase_key)
     if transform_overrides:
@@ -303,7 +299,16 @@ def load_model(
     model.to(device)
     model.eval()
 
-    if weights_path is not None and weights_path.exists():
+    if weights_path is not None:
+        if not weights_path.exists():
+            console.print(f"[bold red]Weights not found:[/] {weights_path}")
+            raise SystemExit(1)
+
+        size_bytes = weights_path.stat().st_size
+        size_mib = size_bytes / (1024**2)
+        console.print(
+            f"[bold green]Loading weights[/]: {weights_path} ({size_mib:.2f} MiB)"
+        )
         state = torch.load(weights_path, map_location=device)
         if isinstance(state, dict) and "state_dict" in state:
             state = state["state_dict"]
@@ -397,9 +402,9 @@ def _run_inference_job(
     weights_path_value = infer_cfg.get("weights")
     weights_path: Path | None = None
     if weights_path_value:
-        weights_path = Path(weights_path_value)
+        weights_path = Path(weights_path_value).expanduser()
         if not weights_path.is_absolute():
-            weights_path = (config_path.parent / weights_path).resolve()
+            weights_path = (Path.cwd() / weights_path).resolve()
 
     model = load_model(model_cfg["name"], num_classes, weights_path, device)
     eval_toggles = resolve_transform_mapping(model_cfg, phase="eval")
