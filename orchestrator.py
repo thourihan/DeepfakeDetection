@@ -30,7 +30,7 @@ from rich.progress import (
     TimeElapsedColumn,
     TimeRemainingColumn,
 )
-from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix, roc_auc_score
+from sklearn.metrics import ConfusionMatrixDisplay, balanced_accuracy_score, confusion_matrix, roc_auc_score
 from torch import nn
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
@@ -459,6 +459,41 @@ def _run_inference_job(
     if not data_root.is_absolute():
         data_root = (Path.cwd() / data_root).resolve()
 
+    # --------- minimal addition: compute best threshold on val (binary only) ----------
+    best_threshold = 0.5
+    if num_classes == 2:
+        val_split = data_cfg.get("val_split", "val")
+        val_path = data_root / val_split
+        if val_path.exists():
+            val_dataset = datasets.ImageFolder(val_path, transform=transforms_eval)
+            if len(val_dataset) > 0:
+                val_loader = build_inference_loader(
+                    dataset=val_dataset, batch_size=batch_size, num_workers=num_workers
+                )
+                val_probs_list: list[torch.Tensor] = []
+                val_targets_list: list[torch.Tensor] = []
+                with torch.inference_mode():
+                    for images, targets in val_loader:
+                        images = images.to(device, non_blocking=True)
+                        logits = model(images)
+                        probs = torch.softmax(logits, dim=1)
+                        val_probs_list.append(probs[:, 1].cpu())
+                        val_targets_list.append(targets.cpu())
+                val_scores = torch.cat(val_probs_list, dim=0).numpy()
+                val_true = torch.cat(val_targets_list, dim=0).numpy()
+                if val_scores.size > 0 and val_true.size > 0 and np.unique(val_true).size > 1:
+                    thresholds = np.linspace(0.0, 1.0, 501, dtype=np.float64)
+                    best_bal = -1.0
+                    chosen = 0.5
+                    for thr in thresholds:
+                        preds = (val_scores >= thr).astype(np.int64)
+                        bal = balanced_accuracy_score(val_true, preds)
+                        if bal > best_bal:
+                            best_bal = float(bal)
+                            chosen = float(thr)
+                    best_threshold = float(chosen)
+    # -------------------------------------------------------------------------------
+
     split = split_name
     dataset_path = data_root / split
     if not dataset_path.exists():
@@ -510,6 +545,10 @@ def _run_inference_job(
     preds_tensor = torch.cat(all_preds, dim=0)
     targets_tensor = torch.cat(all_targets, dim=0)
 
+    # minimal change: override predictions with threshold for binary case
+    if num_classes == 2:
+        preds_tensor = (probs_tensor[:, 1] >= best_threshold).long()
+
     accuracy = (preds_tensor == targets_tensor).float().mean().item()
     metrics: dict[str, Any] = {
         "model": model_cfg["name"],
@@ -532,6 +571,9 @@ def _run_inference_job(
             metrics["roc_auc"] = float(roc_auc)
         except ValueError:
             pass
+
+    if num_classes == 2:
+        metrics["threshold"] = float(best_threshold)
 
     cm = confusion_matrix(targets_tensor.numpy(), preds_tensor.numpy())
     metrics["confusion_matrix"] = cm.tolist()
