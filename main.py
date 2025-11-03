@@ -9,16 +9,15 @@ to disk.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import gradio as gr
 import numpy as np
-import timm
 import torch
 import torch.nn.functional as f
-from efficientnet_pytorch import EfficientNet
-from fastervit import create_model
 from PIL import Image, ImageDraw, ImageFont
 from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.image import show_cam_on_image
@@ -26,68 +25,72 @@ from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 from torch import nn
 from torchvision import transforms
 
-# ---------------------------------------------------------------------
-# Device, weights, and export settings (case-sensitive paths)
-# ---------------------------------------------------------------------
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+from orchestrator import (
+    build_eval_transforms,
+    load_config,
+    load_model,
+    resolve_transform_mapping,
+)
 
-WEIGHTS_DIR = Path("weights")
-EN_WEIGHTS = WEIGHTS_DIR / "EfficientNetModel.pth"
-FV_WEIGHTS = WEIGHTS_DIR / "FasterVitModel.pth"
-EFV2_WEIGHTS = WEIGHTS_DIR / "EfficientFormerV2_S1.pth"
-
-for p in (EN_WEIGHTS, FV_WEIGHTS, EFV2_WEIGHTS):
-    if not p.exists():
-        msg = f"Missing weights: {p}. Expected under {WEIGHTS_DIR.resolve()}."
-        raise FileNotFoundError(msg)
+# ---------------------------------------------------------------------
+# Device, config, and export settings
+# ---------------------------------------------------------------------
+DEFAULT_CONFIG_PATH = Path("config/inference.yaml")
 
 EXPORT_SCALE = 2
 EXPORT_DIR = Path("outputs") / "cam_exports"
 EXPORT_DIR.mkdir(parents=True, exist_ok=True)
 
-# ---------------------------------------------------------------------
-# Labels & preprocessing
-# ---------------------------------------------------------------------
+
+@dataclass
+class ModelBundle:
+    """Container for model-specific inference resources."""
+
+    name: str
+    display_label: str
+    model: nn.Module
+    transform: transforms.Compose
+    normalize: bool
+    device: torch.device
+    target_layer: nn.Module
+
 CLASS_LABELS: dict[int, str] = {0: "fake", 1: "real"}
-
-# ImageNet normalization (EfficientNet/FasterViT).
-TRANSFORM_IMAGENET = transforms.Compose(
-    [
-        transforms.Resize(256),
-        transforms.CenterCrop(224),
-        transforms.ToTensor(),
-        transforms.Normalize(
-            mean=[0.485, 0.456, 0.406],
-            std=[0.229, 0.224, 0.225],
-        ),
-    ],
-)
-
-# Project policy for EfficientFormerV2-S1 (no normalization).
-TRANSFORM_NO_NORM = transforms.Compose(
-    [
-        transforms.Resize(256),
-        transforms.CenterCrop(224),
-        transforms.ToTensor(),
-    ],
-)
+MODEL_CACHE: list[ModelBundle] = []
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+CONFIG_METADATA: dict[str, Any] = {}
 
 
-def _prepare_for_cam(
-    image: Image.Image,
-    img_size: int,
-    *,
-    normalize: bool,
-) -> tuple[torch.Tensor, np.ndarray]:
-    """Return (input_tensor, rgb_float) with aligned spatial transforms."""
-    t = TRANSFORM_IMAGENET if normalize else TRANSFORM_NO_NORM
-    pil_rc = transforms.Compose(
-        [transforms.Resize(img_size), transforms.CenterCrop(img_size)],
-    )
-    pil_img = pil_rc(image.convert("RGB"))
-    rgb = np.asarray(pil_img, dtype=np.float32) / 255.0  # HWC in [0,1]
-    x = t(pil_img).unsqueeze(0).to(DEVICE)  # (1,3,H,W)
-    return x, rgb
+def _resolve_weights_path(path_value: str | None) -> Path | None:
+    """Resolve model weights path like orchestrator: relative to CWD."""
+    if not path_value:
+        return None
+    p = Path(path_value).expanduser()
+    if not p.is_absolute():
+        p = (Path.cwd() / p).resolve()
+    return p
+
+def _tensor_to_rgb(tensor: torch.Tensor, *, normalize: bool) -> np.ndarray:
+    """Convert a (C,H,W) tensor to an RGB float image in [0, 1]."""
+
+    if tensor.ndim == 4:
+        if tensor.size(0) != 1:
+            msg = "Expected batch of size 1 for visualization."
+            raise ValueError(msg)
+        tensor = tensor[0]
+
+    if tensor.ndim != 3:
+        msg = "Expected a 3D tensor for visualization."
+        raise ValueError(msg)
+
+    arr = tensor.detach().clone()
+    if normalize:
+        mean = torch.tensor([0.485, 0.456, 0.406], dtype=arr.dtype, device=arr.device)
+        std = torch.tensor([0.229, 0.224, 0.225], dtype=arr.dtype, device=arr.device)
+        arr = arr * std.view(-1, 1, 1) + mean.view(-1, 1, 1)
+
+    arr = arr.clamp(0.0, 1.0)
+    rgb = arr.permute(1, 2, 0).cpu().numpy().astype(np.float32)
+    return rgb
 
 
 def _find_last_conv_layer(module: nn.Module) -> nn.Module:
@@ -100,6 +103,15 @@ def _find_last_conv_layer(module: nn.Module) -> nn.Module:
         msg = "No Conv2d layer found for Grad-CAM target."
         raise RuntimeError(msg)
     return last
+
+
+def _resolve_cam_target(module: nn.Module) -> nn.Module:
+    """Return a target layer for Grad-CAM, preferring explicit conv heads."""
+
+    conv_head = getattr(module, "_conv_head", None)
+    if isinstance(conv_head, nn.Module):
+        return conv_head
+    return _find_last_conv_layer(module)
 
 
 def _add_label(img_rgb_uint8: np.ndarray, text: str) -> np.ndarray:
@@ -118,34 +130,109 @@ def _add_label(img_rgb_uint8: np.ndarray, text: str) -> np.ndarray:
     return np.asarray(img)
 
 
-# ---------------------------------------------------------------------
-# Model setup
-# ---------------------------------------------------------------------
-# EfficientNet-B3
-efficientnet_model = EfficientNet.from_pretrained("efficientnet-b3")
-_en_in = efficientnet_model._fc.in_features  # noqa: SLF001
-efficientnet_model._fc = nn.Linear(_en_in, 2)  # noqa: SLF001
-efficientnet_model.load_state_dict(torch.load(EN_WEIGHTS, map_location="cpu"))
-efficientnet_model.to(DEVICE).eval()
+def _coerce_device(device_str: str | None) -> torch.device:
+    """Return a :class:`torch.device` for the requested string."""
 
-# FasterViT
-faster_vit_model = create_model("faster_vit_2_224", pretrained=False, model_path=None)
-_fv_in = faster_vit_model.head.in_features
-faster_vit_model.head = nn.Linear(_fv_in, 2)
-faster_vit_model.load_state_dict(torch.load(FV_WEIGHTS, map_location="cpu"))
-faster_vit_model.to(DEVICE).eval()
+    if device_str:
+        requested = torch.device(device_str)
+        if requested.type == "cuda" and not torch.cuda.is_available():
+            print(
+                "[UI] CUDA requested in config but unavailable. Falling back to CPU.",
+            )
+            return torch.device("cpu")
+        return requested
+    return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# EfficientFormerV2-S1 via timm
-efficientformer_model: nn.Module = timm.create_model(
-    "efficientformerv2_s1",
-    pretrained=False,
-    num_classes=2,
-)
-efficientformer_model.load_state_dict(
-    torch.load(EFV2_WEIGHTS, map_location="cpu"),
-    strict=True,
-)
-efficientformer_model.to(DEVICE).eval()
+
+def _detect_normalization(transform: transforms.Compose) -> bool:
+    """Check whether a composed transform includes normalization."""
+
+    for op in getattr(transform, "transforms", []):
+        if isinstance(op, transforms.Normalize):
+            return True
+    return False
+
+
+def initialize_from_config(config_path: Path) -> None:
+    """Load orchestrator config and populate inference resources."""
+
+    global CLASS_LABELS, MODEL_CACHE, DEVICE, CONFIG_METADATA
+
+    config = load_config(config_path)
+
+    CONFIG_METADATA = {
+        "config_path": config_path,
+        "raw": config,
+    }
+
+    device_str = config.get("device")
+    DEVICE = _coerce_device(device_str)
+
+    data_cfg: dict[str, Any] = config.get("data", {})
+    num_classes = int(data_cfg.get("num_classes", 2))
+    image_size = int(data_cfg.get("img_size", 224))
+
+    labels_cfg = data_cfg.get("class_labels")
+    if isinstance(labels_cfg, dict):
+        CLASS_LABELS = {int(k): str(v) for k, v in labels_cfg.items()}
+
+    models_cfg: dict[str, dict[str, Any]] = config.get("models", {})
+    selection: list[str] = config.get("selection") or list(models_cfg.keys())
+
+    bundles: list[ModelBundle] = []
+    for model_name in selection:
+        model_cfg = models_cfg.get(model_name)
+        if not isinstance(model_cfg, dict):
+            print(f"[UI] Skipping unknown model '{model_name}' in selection.")
+            continue
+
+        toggles = resolve_transform_mapping(model_cfg, phase="eval")
+        transform = build_eval_transforms(image_size, toggles=toggles)
+        normalize = _detect_normalization(transform)
+
+        inference_cfg = model_cfg.get("inference", {})
+        weights_path = _resolve_weights_path(inference_cfg.get("weights"))
+
+        model = load_model(model_name, num_classes, weights_path, DEVICE)
+        target_layer = _resolve_cam_target(model)
+
+        display_label = (
+            str(model_cfg.get("display_name")
+                or model_cfg.get("label")
+                or model_name)
+        )
+
+        bundles.append(
+            ModelBundle(
+                name=model_name,
+                display_label=display_label,
+                model=model,
+                transform=transform,
+                normalize=normalize,
+                device=DEVICE,
+                target_layer=target_layer,
+            ),
+        )
+
+    if not bundles:
+        msg = "No valid models configured for inference."
+        raise RuntimeError(msg)
+
+    MODEL_CACHE = bundles
+
+
+def build_interface(config_path: Path = DEFAULT_CONFIG_PATH) -> gr.Interface:
+    """Create a Gradio interface configured via orchestrator settings."""
+
+    initialize_from_config(config_path)
+
+    return gr.Interface(
+        fn=predict_and_visualize,
+        inputs=gr.Image(type="pil"),
+        outputs=[gr.Image(type="numpy"), "text"],
+        title="Real vs Fake Face Detection",
+        description="Upload an image to determine if the face is real or fake.",
+    )
 
 
 # ---------------------------------------------------------------------
@@ -157,74 +244,50 @@ def predict_and_visualize(image: Image.Image) -> tuple[np.ndarray, str]:
     Returns a high-resolution concatenated image (as a NumPy array) and a
     summary string with predicted labels and confidences for each model.
     """
-    # EfficientNet prediction
-    with torch.inference_mode():
-        x_en = TRANSFORM_IMAGENET(image).unsqueeze(0).to(DEVICE)
-        logits_en = efficientnet_model(x_en)
-        probs_en = f.softmax(logits_en, dim=1)
-        cls_en = int(probs_en.argmax(1))
-        conf_en = float(probs_en[0, cls_en] * 100.0)
-        label_en = CLASS_LABELS.get(cls_en, f"class_{cls_en}")
+    panels: list[np.ndarray] = []
+    summary_lines: list[str] = []
 
-    # FasterViT prediction
-    with torch.inference_mode():
-        x_fv = TRANSFORM_IMAGENET(image).unsqueeze(0).to(DEVICE)
-        logits_fv = faster_vit_model(x_fv)
-        probs_fv = f.softmax(logits_fv, dim=1)
-        cls_fv = int(probs_fv.argmax(1))
-        conf_fv = float(probs_fv[0, cls_fv] * 100.0)
-        label_fv = CLASS_LABELS.get(cls_fv, f"class_{cls_fv}")
+    for bundle in MODEL_CACHE:
+        tensor = bundle.transform(image)
+        if not isinstance(tensor, torch.Tensor):
+            msg = f"Transform for {bundle.name} must return a tensor."
+            raise TypeError(msg)
 
-    # EfficientFormerV2-S1 prediction
-    with torch.inference_mode():
-        x_ef = TRANSFORM_NO_NORM(image).unsqueeze(0).to(DEVICE)
-        probs_ef = f.softmax(efficientformer_model(x_ef), dim=1)
-        cls_ef = int(probs_ef.argmax(1))
-        conf_ef = float(probs_ef[0, cls_ef] * 100.0)
-        label_ef = CLASS_LABELS.get(cls_ef, f"class_{cls_ef}")
+        if tensor.ndim == 3:
+            batch = tensor.unsqueeze(0)
+        elif tensor.ndim == 4:
+            batch = tensor
+        else:
+            msg = f"Unexpected tensor rank {tensor.ndim} for model {bundle.name}."
+            raise ValueError(msg)
 
-    # Grad-CAM: one overlay per model
-    # EfficientNet CAM
-    x_cam_en, rgb_en = _prepare_for_cam(image, img_size=224, normalize=True)
-    target_layer_en = efficientnet_model._conv_head  # noqa: SLF001
-    with GradCAM(model=efficientnet_model, target_layers=[target_layer_en]) as cam_en:
-        gray_en = cam_en(
-            input_tensor=x_cam_en,
-            targets=[ClassifierOutputTarget(cls_en)],
-        )[0]
-    overlay_en = show_cam_on_image(rgb_en, gray_en, use_rgb=True)
-    panel_en = _add_label(overlay_en, f"EfficientNet-B3 {label_en} ({conf_en:.1f}%)")
+        batch = batch.to(bundle.device)
 
-    # FasterViT CAM (last conv found in the model)
-    x_cam_fv, rgb_fv = _prepare_for_cam(image, img_size=224, normalize=True)
-    target_layer_fv = _find_last_conv_layer(faster_vit_model)
-    with GradCAM(model=faster_vit_model, target_layers=[target_layer_fv]) as cam_fv:
-        gray_fv = cam_fv(
-            input_tensor=x_cam_fv,
-            targets=[ClassifierOutputTarget(cls_fv)],
-        )[0]
-    overlay_fv = show_cam_on_image(rgb_fv, gray_fv, use_rgb=True)
-    panel_fv = _add_label(overlay_fv, f"FasterViT {label_fv} ({conf_fv:.1f}%)")
+        with torch.inference_mode():
+            logits = bundle.model(batch)
+            probs = f.softmax(logits, dim=1)
+            cls_idx = int(probs.argmax(1))
+            confidence = float(probs[0, cls_idx] * 100.0)
 
-    # EfficientFormerV2-S1 CAM
-    x_cam_ef, rgb_ef = _prepare_for_cam(image, img_size=224, normalize=False)
-    target_layer_ef = _find_last_conv_layer(efficientformer_model)
-    with GradCAM(
-        model=efficientformer_model,
-        target_layers=[target_layer_ef],
-    ) as cam_ef:
-        gray_ef = cam_ef(
-            input_tensor=x_cam_ef,
-            targets=[ClassifierOutputTarget(cls_ef)],
-        )[0]
-    overlay_ef = show_cam_on_image(rgb_ef, gray_ef, use_rgb=True)
-    panel_ef = _add_label(
-        overlay_ef,
-        f"EfficientFormerV2-S1 {label_ef} ({conf_ef:.1f}%)",
-    )
+        label = CLASS_LABELS.get(cls_idx, f"class_{cls_idx}")
+        summary_lines.append(f"{bundle.display_label}: {label} ({confidence:.2f}% confidence)")
 
-    # Concatenate panels horizontally
-    side_by_side = np.concatenate([panel_en, panel_fv, panel_ef], axis=1)
+        with GradCAM(model=bundle.model, target_layers=[bundle.target_layer]) as cam:
+            grayscale = cam(
+                input_tensor=batch,
+                targets=[ClassifierOutputTarget(cls_idx)],
+            )[0]
+
+        rgb = _tensor_to_rgb(tensor, normalize=bundle.normalize)
+        overlay = show_cam_on_image(rgb, grayscale, use_rgb=True)
+        panel = _add_label(overlay, f"{bundle.display_label} {label} ({confidence:.1f}%)")
+        panels.append(panel)
+
+    if not panels:
+        msg = "No models available for inference."
+        raise RuntimeError(msg)
+
+    side_by_side = np.concatenate(panels, axis=1)
 
     # Export high-res image
     h, w, _ = side_by_side.shape
@@ -239,25 +302,27 @@ def predict_and_visualize(image: Image.Image) -> tuple[np.ndarray, str]:
     export_img.save(out_path, format="PNG", optimize=True)
 
     # Return upscaled image to Gradio as well
-    summary = (
-        f"EfficientNet-B3: {label_en} ({conf_en:.2f}% confidence)\n"
-        f"FasterViT: {label_fv} ({conf_fv:.2f}% confidence)\n"
-        f"EfficientFormerV2-S1: {label_ef} ({conf_ef:.2f}% confidence)\n"
-        f"Saved: {out_path.resolve()}"
-    )
+    summary = "\n".join(summary_lines + [f"Saved: {out_path.resolve()}"])
     return np.asarray(export_img), summary
 
 
 # ---------------------------------------------------------------------
 # Gradio UI
 # ---------------------------------------------------------------------
-iface = gr.Interface(
-    fn=predict_and_visualize,
-    inputs=gr.Image(type="pil"),
-    outputs=[gr.Image(type="numpy"), "text"],
-    title="Real vs Fake Face Detection",
-    description="Upload an image to determine if the face is real or fake.",
-)
+iface = build_interface()
+
 
 if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Deepfake detection UI")
+    parser.add_argument(
+        "--config",
+        type=Path,
+        default=DEFAULT_CONFIG_PATH,
+        help="Path to an orchestrator inference YAML config.",
+    )
+    args = parser.parse_args()
+
+    iface = build_interface(args.config)
     iface.launch()
