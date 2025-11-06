@@ -25,7 +25,7 @@ from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 from torch import nn
 from torchvision import transforms
 
-from orchestrator import (
+from orchestration.orchestrator import (
     build_eval_transforms,
     load_config,
     load_model,
