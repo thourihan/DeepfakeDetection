@@ -1,4 +1,3 @@
-# orchestration/config_schema.py
 from __future__ import annotations
 
 from typing import Any
@@ -7,6 +6,7 @@ from pydantic import BaseModel, Field, ConfigDict, field_validator, model_valida
 
 
 class DataConfig(BaseModel):
+    # data is fairly stable, so we can ignore extra keys here to stay backward-compatible
     model_config = ConfigDict(extra="ignore")
 
     root: str = Field(..., description="Root directory for the dataset.")
@@ -19,6 +19,7 @@ class DataConfig(BaseModel):
 
 
 class InferenceConfig(BaseModel):
+    # inference blocks tend to grow (extra options, transforms), so allow unknown keys
     model_config = ConfigDict(extra="allow")
 
     weights: str | None = None
@@ -30,6 +31,7 @@ class InferenceConfig(BaseModel):
 
 
 class TrainingConfig(BaseModel):
+    # same idea as inference: different trainers may read different knobs
     model_config = ConfigDict(extra="allow")
 
     batch_size: int = 64
@@ -41,6 +43,7 @@ class TrainingConfig(BaseModel):
 
 
 class ModelConfig(BaseModel):
+    # per-model blocks often have bespoke fields, so don't be strict here
     model_config = ConfigDict(extra="allow")
 
     output_dir: str | None = None
@@ -64,6 +67,7 @@ class OrchestratorConfig(BaseModel):
     @field_validator("models")
     @classmethod
     def _ensure_models_not_empty(cls, value: dict[str, ModelConfig]) -> dict[str, ModelConfig]:
+        # we never want to run train/inference with an empty models: block
         if not value:
             msg = "config.models cannot be empty"
             raise ValueError(msg)
@@ -73,11 +77,11 @@ class OrchestratorConfig(BaseModel):
     def _normalize_selection(self) -> "OrchestratorConfig":
         models = self.models or {}
         if self.selection is None:
-            # default to all models in the YAML
+            # default to 'all models' if user didn't specify selection
             self.selection = list(models.keys())
             return self
 
-        # user provided selection — validate it
+        # user supplied a selection: make sure every name exists in models:
         missing = [name for name in self.selection if name not in models]
         if missing:
             msg = f"selection references unknown models: {', '.join(missing)}"
