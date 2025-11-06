@@ -21,6 +21,7 @@ models:
       split: test
       batch_size: 256
       num_workers: 2
+      img_size: 224
   efficientformerv2_s1:
     output_dir: runs/efficientformerv2_s1
     transforms:
@@ -33,6 +34,7 @@ models:
       split: test
       batch_size: 256
       num_workers: 4
+      img_size: 224
   faster_vit_2_224:
     output_dir: runs/faster_vit_2_224
     transforms:
@@ -45,6 +47,7 @@ models:
       split: test
       batch_size: 256
       num_workers: 4
+      img_size: 224
 
 selection:
   - efficientnet_b3
