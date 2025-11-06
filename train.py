@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from orchestrator import orchestrate
+from orchestration.orchestrator import orchestrate
 
 
 def main() -> None:
