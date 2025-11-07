@@ -293,7 +293,13 @@ def maybe_load_checkpoint(
     return state
 
 
-def require_num_classes(dataset: Any, expected: int, *, split: str) -> None:
+def require_num_classes(
+    dataset: Any,
+    expected: int,
+    *,
+    split: str,
+    dataset_root: Path | str | None = None,
+) -> None:
     """Ensure an ImageFolder-style dataset exposes the configured classes."""
 
     if expected <= 0:
@@ -310,9 +316,12 @@ def require_num_classes(dataset: Any, expected: int, *, split: str) -> None:
     preview = ", ".join(str(name) for name in classes[: min(5, actual)])
     if actual > 5:
         preview += ", …"
+    root_hint = ""
+    if dataset_root is not None:
+        root_hint = f" at {Path(dataset_root)}"
     raise ValueError(
         "Class count mismatch for split "
-        f"'{split}': dataset exposes {actual} classes ({preview}) "
+        f"'{split}'{root_hint}: dataset exposes {actual} classes ({preview}) "
         f"but configuration sets DD_NUM_CLASSES={expected}. "
         "Update config.data.num_classes (e.g., match it to the true number of "
         "categories in your ImageFolder)."

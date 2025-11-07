@@ -42,7 +42,7 @@ from torchvision import datasets, transforms
 
 from .config_schema import OrchestratorConfig
 from .model_registry import get_model_spec
-from .train_env import apply_seed
+from .train_env import apply_seed, require_num_classes
 
 console = Console()
 
@@ -188,6 +188,8 @@ def build_env_overrides(
     training: bool,
 ) -> dict[str, str]:
     data_cfg = config.get("data", {})
+    train_cfg = model_cfg.get("training", {})
+    infer_cfg = model_cfg.get("inference", {})
     overrides: dict[str, str] = {"DD_OUTPUT_DIR": str(run_paths.run_dir)}
 
     seed = config.get("seed")
@@ -212,12 +214,14 @@ def build_env_overrides(
         if value is not None:
             overrides[env_key] = str(value)
 
-    num_classes = model_cfg.get("num_classes")
+    num_classes = infer_cfg.get(
+        "num_classes",
+        model_cfg.get("num_classes", data_cfg.get("num_classes")),
+    )
     if num_classes is not None:
         overrides["DD_NUM_CLASSES"] = str(num_classes)
 
     if training:
-        train_cfg = model_cfg.get("training", {})
         if "batch_size" in train_cfg:
             overrides["DD_BATCH_SIZE"] = str(train_cfg["batch_size"])
         if "epochs" in train_cfg:
@@ -232,14 +236,32 @@ def build_env_overrides(
             "1" if resume_flag in {"1", "true", "auto"} else "0"
         )
     else:
-        infer_cfg = model_cfg.get("inference", {})
-        if "batch_size" in infer_cfg:
-            overrides["DD_BATCH_SIZE"] = str(infer_cfg["batch_size"])
-        if "num_workers" in infer_cfg:
-            overrides["DD_NUM_WORKERS"] = str(infer_cfg["num_workers"])
-        img_override = infer_cfg.get("img_size")
-        if img_override is not None:
-            overrides["DD_IMG_SIZE"] = str(img_override)
+        spec = get_model_spec(model_cfg["name"])
+
+        split_override = infer_cfg.get("split")
+        if split_override:
+            overrides["DD_TEST_SPLIT"] = str(split_override)
+
+        batch_size = infer_cfg.get("batch_size")
+        if batch_size is None:
+            batch_size = train_cfg.get("batch_size")
+        if batch_size is None:
+            batch_size = 64
+        overrides["DD_BATCH_SIZE"] = str(batch_size)
+
+        num_workers = infer_cfg.get("num_workers")
+        if num_workers is None:
+            num_workers = train_cfg.get("num_workers")
+        if num_workers is None:
+            num_workers = data_cfg.get("num_workers", 0)
+        overrides["DD_NUM_WORKERS"] = str(num_workers)
+
+        image_size = infer_cfg.get("img_size")
+        if image_size is None:
+            image_size = train_cfg.get("img_size")
+        if image_size is None:
+            image_size = data_cfg.get("img_size", spec.default_image_size)
+        overrides["DD_IMG_SIZE"] = str(image_size)
 
     phase_key = "train" if training else "eval"
     transform_overrides = resolve_transform_mapping(model_cfg, phase=phase_key)
@@ -518,6 +540,12 @@ def _run_inference_job(
         raise SystemExit(1)
 
     dataset = datasets.ImageFolder(dataset_path, transform=transforms_eval)
+    require_num_classes(
+        dataset,
+        num_classes,
+        split=split,
+        dataset_root=dataset_path,
+    )
     if len(dataset) == 0:
         local_console.print(f"[bold yellow]No images found in[/] {dataset_path}")
         return
