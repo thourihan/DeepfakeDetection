@@ -190,25 +190,25 @@ def build_env_overrides(
     data_cfg = config.get("data", {})
     train_cfg = model_cfg.get("training", {})
     infer_cfg = model_cfg.get("inference", {})
-    overrides: dict[str, str] = {"DD_OUTPUT_DIR": str(run_paths.run_dir)}
+    overrides: dict[str, str] = {"OUTPUT_DIR": str(run_paths.run_dir)}
 
     seed = config.get("seed")
     if seed is not None:
-        overrides["DD_SEED"] = str(seed)
+        overrides["SEED"] = str(seed)
 
     device = config.get("device")
     if device:
-        overrides["DD_DEVICE"] = str(device)
+        overrides["DEVICE"] = str(device)
 
     data_root = data_cfg.get("root")
     if data_root:
-        overrides["DD_DATA_ROOT"] = str(Path(data_root).expanduser().resolve())
+        overrides["DATA_ROOT"] = str(Path(data_root).expanduser().resolve())
     for key, env_key in (
-        ("train_split", "DD_TRAIN_SPLIT"),
-        ("val_split", "DD_VAL_SPLIT"),
-        ("test_split", "DD_TEST_SPLIT"),
-        ("img_size", "DD_IMG_SIZE"),
-        ("num_classes", "DD_NUM_CLASSES"),
+        ("train_split", "TRAIN_SPLIT"),
+        ("val_split", "VAL_SPLIT"),
+        ("test_split", "TEST_SPLIT"),
+        ("img_size", "IMG_SIZE"),
+        ("num_classes", "NUM_CLASSES"),
     ):
         value = data_cfg.get(key)
         if value is not None:
@@ -219,20 +219,20 @@ def build_env_overrides(
         model_cfg.get("num_classes", data_cfg.get("num_classes")),
     )
     if num_classes is not None:
-        overrides["DD_NUM_CLASSES"] = str(num_classes)
+        overrides["NUM_CLASSES"] = str(num_classes)
 
     if training:
         if "batch_size" in train_cfg:
-            overrides["DD_BATCH_SIZE"] = str(train_cfg["batch_size"])
+            overrides["BATCH_SIZE"] = str(train_cfg["batch_size"])
         if "epochs" in train_cfg:
-            overrides["DD_EPOCHS"] = str(train_cfg["epochs"])
+            overrides["EPOCHS"] = str(train_cfg["epochs"])
         if "num_workers" in train_cfg:
-            overrides["DD_NUM_WORKERS"] = str(train_cfg["num_workers"])
+            overrides["NUM_WORKERS"] = str(train_cfg["num_workers"])
         img_override = train_cfg.get("img_size")
         if img_override is not None:
-            overrides["DD_IMG_SIZE"] = str(img_override)
+            overrides["IMG_SIZE"] = str(img_override)
         resume_flag = str(train_cfg.get("resume", "")).lower()
-        overrides["DD_RESUME_AUTO"] = (
+        overrides["RESUME_AUTO"] = (
             "1" if resume_flag in {"1", "true", "auto"} else "0"
         )
     else:
@@ -240,33 +240,33 @@ def build_env_overrides(
 
         split_override = infer_cfg.get("split")
         if split_override:
-            overrides["DD_TEST_SPLIT"] = str(split_override)
+            overrides["TEST_SPLIT"] = str(split_override)
 
         batch_size = infer_cfg.get("batch_size")
         if batch_size is None:
             batch_size = train_cfg.get("batch_size")
         if batch_size is None:
             batch_size = 64
-        overrides["DD_BATCH_SIZE"] = str(batch_size)
+        overrides["BATCH_SIZE"] = str(batch_size)
 
         num_workers = infer_cfg.get("num_workers")
         if num_workers is None:
             num_workers = train_cfg.get("num_workers")
         if num_workers is None:
             num_workers = data_cfg.get("num_workers", 0)
-        overrides["DD_NUM_WORKERS"] = str(num_workers)
+        overrides["NUM_WORKERS"] = str(num_workers)
 
         image_size = infer_cfg.get("img_size")
         if image_size is None:
             image_size = train_cfg.get("img_size")
         if image_size is None:
             image_size = data_cfg.get("img_size", spec.default_image_size)
-        overrides["DD_IMG_SIZE"] = str(image_size)
+        overrides["IMG_SIZE"] = str(image_size)
 
     phase_key = "train" if training else "eval"
     transform_overrides = resolve_transform_mapping(model_cfg, phase=phase_key)
     if transform_overrides:
-        overrides["DD_TRANSFORMS"] = json.dumps(transform_overrides)
+        overrides["TRANSFORMS"] = json.dumps(transform_overrides)
 
     return overrides
 
@@ -288,7 +288,7 @@ def run_training_job(
     )
     log_path = run_paths.logs / "train.log"
     log_path.unlink(missing_ok=True)
-    overrides["DD_LOG_PATH"] = str(log_path)
+    overrides["LOG_PATH"] = str(log_path)
     console.print(f"[bold]→ training {model_cfg['name']}[/]")
     with patched_environ(overrides):
         trainer_main = import_trainer(spec.train_module)

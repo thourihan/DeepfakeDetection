@@ -79,9 +79,9 @@ class _TeeStream(io.TextIOBase):
 
 
 def create_console(*, width: int | None = None) -> Console:
-    """Build a Rich console that mirrors output to ``DD_LOG_PATH`` if provided."""
+    """Build a Rich console that mirrors output to ``LOG_PATH`` if provided."""
 
-    log_path_value = os.environ.get("DD_LOG_PATH")
+    log_path_value = os.environ.get("LOG_PATH")
     stream: io.TextIOBase = sys.stdout
     if log_path_value:
         log_path = Path(log_path_value).expanduser()
@@ -110,7 +110,7 @@ def _as_bool(value: Any) -> bool:
 def load_transform_toggles(
     defaults: dict[str, bool],
     *,
-    env_var: str = "DD_TRANSFORMS",
+    env_var: str = "TRANSFORMS",
     required: Sequence[str] | None = None,
 ) -> dict[str, bool]:
     """Return per-transform enable flags supplied via environment variables.
@@ -162,13 +162,13 @@ def prepare_training_environment(
         Filename used when saving the best model weights.
     default_output_dir:
         Where to place outputs when the orchestrator does not set
-        ``DD_OUTPUT_DIR``. Defaults to the current working directory.
+        ``OUTPUT_DIR``. Defaults to the current working directory.
     best_checkpoint_name / latest_checkpoint_name:
         Filenames for checkpoint files within the checkpoints directory.
     """
 
     base_dir = Path(
-        os.environ.get("DD_OUTPUT_DIR", default_output_dir or Path.cwd())
+        os.environ.get("OUTPUT_DIR", default_output_dir or Path.cwd())
     ).expanduser().resolve()
     checkpoints_dir = base_dir / "checkpoints"
     logs_dir = base_dir / "logs"
@@ -179,13 +179,13 @@ def prepare_training_environment(
     best_checkpoint_path = checkpoints_dir / best_checkpoint_name
     latest_checkpoint_path = checkpoints_dir / latest_checkpoint_name
 
-    resume_flag = os.environ.get("DD_RESUME_AUTO", "").strip()
+    resume_flag = os.environ.get("RESUME_AUTO", "").strip()
     resume_checkpoint: Path | None = None
     if resume_flag == "1" and latest_checkpoint_path.exists():
         resume_checkpoint = latest_checkpoint_path
 
-    seed = int(os.environ["DD_SEED"]) if "DD_SEED" in os.environ else None
-    device_override = os.environ.get("DD_DEVICE")
+    seed = int(os.environ["SEED"]) if "SEED" in os.environ else None
+    device_override = os.environ.get("DEVICE")
 
     return TrainingEnvironment(
         output_dir=base_dir,
@@ -322,7 +322,7 @@ def require_num_classes(
     raise ValueError(
         "Class count mismatch for split "
         f"'{split}'{root_hint}: dataset exposes {actual} classes ({preview}) "
-        f"but configuration sets DD_NUM_CLASSES={expected}. "
+        f"but configuration sets NUM_CLASSES={expected}. "
         "Update config.data.num_classes (e.g., match it to the true number of "
         "categories in your ImageFolder)."
     )
