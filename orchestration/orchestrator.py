@@ -40,6 +40,7 @@ from torch import nn
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
+from .config_schema import OrchestratorConfig
 from .model_registry import get_model_spec
 from .train_env import apply_seed
 
@@ -109,8 +110,19 @@ def tee_output(log_path: Path) -> Iterator[None]:
 
 
 def load_config(path: Path) -> dict[str, Any]:
+    """Load and validate an orchestrator YAML config.
+
+    Returns a plain dict so existing codepaths
+    keep working without having to know about Pydantic.
+    """
     with path.open("r", encoding="utf-8") as handle:
-        return yaml.safe_load(handle)
+        raw = yaml.safe_load(handle)
+
+    # validate + inject defaults
+    cfg = OrchestratorConfig(**raw)
+
+    # hand back a dict so callers that do .get(...) don't break
+    return cfg.dict()
 
 
 def _coerce_bool(value: Any) -> bool:
