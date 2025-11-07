@@ -40,9 +40,9 @@ from torch import nn
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
+from .config_schema import OrchestratorConfig
 from .model_registry import get_model_spec
 from .train_env import apply_seed
-from .config_schema import OrchestratorConfig
 
 console = Console()
 

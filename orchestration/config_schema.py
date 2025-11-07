@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class DataConfig(BaseModel):
@@ -74,7 +74,7 @@ class OrchestratorConfig(BaseModel):
         return value
 
     @model_validator(mode="after")
-    def _normalize_selection(self) -> "OrchestratorConfig":
+    def _normalize_selection(self) -> OrchestratorConfig:
         models = self.models or {}
         if self.selection is None:
             # default to 'all models' if user didn't specify selection
