@@ -308,14 +308,14 @@ def main() -> None:  # noqa: PLR0915
     )
     apply_seed(env.seed)
 
-    data_root = env_path("DD_DATA_ROOT", DATA_ROOT)
-    train_split = env_str("DD_TRAIN_SPLIT", "Train")
-    val_split = env_str("DD_VAL_SPLIT", "Validation")
-    batch_size = env_int("DD_BATCH_SIZE", BATCH_SIZE)
-    epochs = env_int("DD_EPOCHS", EPOCHS)
-    img_size = env_int("DD_IMG_SIZE", IMG_SIZE)
-    num_workers = env_int("DD_NUM_WORKERS", NUM_WORKERS)
-    num_classes = env_int("DD_NUM_CLASSES", 2)
+    data_root = env_path("DATA_ROOT", DATA_ROOT)
+    train_split = env_str("TRAIN_SPLIT", "Train")
+    val_split = env_str("VAL_SPLIT", "Validation")
+    batch_size = env_int("BATCH_SIZE", BATCH_SIZE)
+    epochs = env_int("EPOCHS", EPOCHS)
+    img_size = env_int("IMG_SIZE", IMG_SIZE)
+    num_workers = env_int("NUM_WORKERS", NUM_WORKERS)
+    num_classes = env_int("NUM_CLASSES", 2)
 
     use_cuda = torch.cuda.is_available()
     device = "cuda" if use_cuda else "cpu"
