@@ -213,27 +213,50 @@ def apply_seed(seed: int | None) -> None:
     torch.backends.cudnn.benchmark = False
 
 
+def _get_env(name: str) -> str | None:
+    """Return the preferred env var value, falling back to legacy prefixes."""
+
+    value = os.environ.get(name)
+    if value is not None:
+        return value
+    legacy = f"DD_{name}"
+    return os.environ.get(legacy)
+
+
 def env_path(name: str, default: Path) -> Path:
     """Return a :class:`Path` override supplied via environment variables."""
 
-    value = os.environ.get(name)
+    value = _get_env(name)
     return Path(value).expanduser().resolve() if value else default
 
 
 def env_str(name: str, default: str) -> str:
     """Return a string override supplied via environment variables."""
 
-    return os.environ.get(name, default)
+    value = _get_env(name)
+    return value if value is not None else default
 
 
 def env_int(name: str, default: int) -> int:
     """Return an integer override supplied via environment variables."""
 
-    value = os.environ.get(name)
+    value = _get_env(name)
     if value is None:
         return default
     try:
         return int(value)
+    except ValueError:
+        return default
+
+
+def env_float(name: str, default: float) -> float:
+    """Return a float override supplied via environment variables."""
+
+    value = _get_env(name)
+    if value is None:
+        return default
+    try:
+        return float(value)
     except ValueError:
         return default
 

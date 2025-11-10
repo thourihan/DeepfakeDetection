@@ -43,6 +43,7 @@ from torchvision.transforms import InterpolationMode
 from orchestration.train_env import (
     apply_seed,
     create_console,
+    env_float,
     env_int,
     env_path,
     env_str,
@@ -61,10 +62,10 @@ DATA_ROOT: Path = Path.home() / "code" / "DeepfakeDetection" / "data" / "Dataset
 MODEL_NAME: str = "faster_vit_2_224"
 
 # Training hyperparameters.
-EPOCHS: int = 25
-BATCH_SIZE: int = 64
-IMG_SIZE: int = 224
-NUM_WORKERS: int = 8
+DEFAULT_EPOCHS: int = 25
+DEFAULT_BATCH_SIZE: int = 64
+DEFAULT_IMG_SIZE: int = 224
+DEFAULT_NUM_WORKERS: int = 8
 
 # LRs/WDs for the two phases.
 HEAD_LR: float = 3e-4
@@ -73,7 +74,7 @@ FT_LR: float = 1e-4
 FT_WD: float = 5e-2
 
 # Early stopping by Validation accuracy.
-PATIENCE: int = 4  # epochs without improvement
+DEFAULT_PATIENCE: int = 4  # epochs without improvement
 
 # Output filenames (paths resolved at runtime via :mod:`train_env`).
 BEST_WEIGHTS_NAME: str = "FasterVitModel.pth"
@@ -311,11 +312,14 @@ def main() -> None:  # noqa: PLR0915
     data_root = env_path("DATA_ROOT", DATA_ROOT)
     train_split = env_str("TRAIN_SPLIT", "Train")
     val_split = env_str("VAL_SPLIT", "Validation")
-    batch_size = env_int("BATCH_SIZE", BATCH_SIZE)
-    epochs = env_int("EPOCHS", EPOCHS)
-    img_size = env_int("IMG_SIZE", IMG_SIZE)
-    num_workers = env_int("NUM_WORKERS", NUM_WORKERS)
+    batch_size = env_int("BATCH_SIZE", DEFAULT_BATCH_SIZE)
+    epochs = env_int("EPOCHS", DEFAULT_EPOCHS)
+    img_size = env_int("IMG_SIZE", DEFAULT_IMG_SIZE)
+    num_workers = env_int("NUM_WORKERS", DEFAULT_NUM_WORKERS)
     num_classes = env_int("NUM_CLASSES", 2)
+    ft_lr = env_float("LR", FT_LR)
+    ft_wd = env_float("WEIGHT_DECAY", FT_WD)
+    early_stop_patience = env_int("EARLY_STOP_PATIENCE", DEFAULT_PATIENCE)
 
     use_cuda = torch.cuda.is_available()
     device = "cuda" if use_cuda else "cpu"
@@ -450,8 +454,8 @@ def main() -> None:  # noqa: PLR0915
 
         opt = optim.AdamW(
             (p for p in model.parameters() if p.requires_grad),
-            lr=FT_LR,
-            weight_decay=FT_WD,
+            lr=ft_lr,
+            weight_decay=ft_wd,
         )
         scheduler = optim.lr_scheduler.CosineAnnealingLR(opt, T_max=max(1, epochs - 1))
 
@@ -519,9 +523,9 @@ def main() -> None:  # noqa: PLR0915
                     f"[bold green]↑ new best[/] val_acc={best_val_acc:.4f} "
                     f"(epoch {best_epoch}) → saved {env.best_weights_path.name}",
                 )
-            elif epochs_no_improve >= PATIENCE:
+            elif epochs_no_improve >= early_stop_patience:
                 console.print(
-                    f"[bold yellow]Early stopping[/]: no improvement for {PATIENCE} epoch(s). "
+                    f"[bold yellow]Early stopping[/]: no improvement for {early_stop_patience} epoch(s). "
                     f"Best at epoch {best_epoch} with val_acc={best_val_acc:.4f}.",
                 )
                 break

@@ -187,6 +187,11 @@ def build_env_overrides(
     run_paths: RunPaths,
     training: bool,
 ) -> dict[str, str]:
+    """Compute environment overrides used by trainers.
+
+    All trainers should read training hyperparameters from these env vars; the
+    orchestrator is the source of truth.
+    """
     data_cfg = config.get("data", {})
     train_cfg = model_cfg.get("training", {})
     infer_cfg = model_cfg.get("inference", {})
@@ -222,12 +227,19 @@ def build_env_overrides(
         overrides["NUM_CLASSES"] = str(num_classes)
 
     if training:
-        if "batch_size" in train_cfg:
-            overrides["BATCH_SIZE"] = str(train_cfg["batch_size"])
-        if "epochs" in train_cfg:
-            overrides["EPOCHS"] = str(train_cfg["epochs"])
-        if "num_workers" in train_cfg:
-            overrides["NUM_WORKERS"] = str(train_cfg["num_workers"])
+        for key, env_key in (
+            ("batch_size", "BATCH_SIZE"),
+            ("epochs", "EPOCHS"),
+            ("num_workers", "NUM_WORKERS"),
+            ("lr", "LR"),
+            ("weight_decay", "WEIGHT_DECAY"),
+            ("accum_steps", "ACCUM_STEPS"),
+            ("warmup_epochs", "WARMUP_EPOCHS"),
+            ("early_stop_patience", "EARLY_STOP_PATIENCE"),
+        ):
+            value = train_cfg.get(key)
+            if value is not None:
+                overrides[env_key] = str(value)
         img_override = train_cfg.get("img_size")
         if img_override is not None:
             overrides["IMG_SIZE"] = str(img_override)
