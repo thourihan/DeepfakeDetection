@@ -37,6 +37,7 @@ from torchvision.transforms import InterpolationMode
 from orchestration.train_env import (
     apply_seed,
     create_console,
+    env_float,
     env_int,
     env_path,
     env_str,
@@ -51,10 +52,12 @@ from orchestration.train_env import (
 # Configuration constants (could be moved to a config file).
 DATA_ROOT: Path = Path.home() / "code" / "DeepfakeDetection" / "data" / "Dataset"
 MODEL_NAME: str = "efficientformerv2_s1"
-EPOCHS: int = 5
-BATCH_SIZE: int = 128
-IMG_SIZE: int = 224
-NUM_WORKERS: int = 8
+DEFAULT_EPOCHS: int = 5
+DEFAULT_BATCH_SIZE: int = 128
+DEFAULT_IMG_SIZE: int = 224
+DEFAULT_NUM_WORKERS: int = 8
+DEFAULT_LR: float = 1e-4
+DEFAULT_WEIGHT_DECAY: float = 5e-2
 BEST_WEIGHTS_NAME: str = "EfficientFormerV2_S1.pth"
 BEST_CKPT_NAME: str = "best.ckpt"
 LATEST_CKPT_NAME: str = "latest.ckpt"
@@ -266,11 +269,13 @@ def main() -> None:  # noqa: PLR0915
     data_root = env_path("DATA_ROOT", DATA_ROOT)
     train_split = env_str("TRAIN_SPLIT", "Train")
     val_split = env_str("VAL_SPLIT", "Validation")
-    batch_size = env_int("BATCH_SIZE", BATCH_SIZE)
-    epochs = env_int("EPOCHS", EPOCHS)
-    img_size = env_int("IMG_SIZE", IMG_SIZE)
-    num_workers = env_int("NUM_WORKERS", NUM_WORKERS)
+    batch_size = env_int("BATCH_SIZE", DEFAULT_BATCH_SIZE)
+    epochs = env_int("EPOCHS", DEFAULT_EPOCHS)
+    img_size = env_int("IMG_SIZE", DEFAULT_IMG_SIZE)
+    num_workers = env_int("NUM_WORKERS", DEFAULT_NUM_WORKERS)
     num_classes = env_int("NUM_CLASSES", 2)
+    lr = env_float("LR", DEFAULT_LR)
+    weight_decay = env_float("WEIGHT_DECAY", DEFAULT_WEIGHT_DECAY)
 
     use_cuda = torch.cuda.is_available()
     device = "cuda" if use_cuda else "cpu"
@@ -389,8 +394,8 @@ def main() -> None:  # noqa: PLR0915
 
         opt = optim.AdamW(
             (p for p in model.parameters() if p.requires_grad),
-            lr=1e-4,
-            weight_decay=5e-2,
+            lr=lr,
+            weight_decay=weight_decay,
         )
         scheduler = optim.lr_scheduler.CosineAnnealingLR(opt, T_max=max(1, epochs - 1))
 

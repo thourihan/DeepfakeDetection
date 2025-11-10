@@ -223,7 +223,8 @@ def env_path(name: str, default: Path) -> Path:
 def env_str(name: str, default: str) -> str:
     """Return a string override supplied via environment variables."""
 
-    return os.environ.get(name, default)
+    value = os.environ.get(name)
+    return value if value is not None else default
 
 
 def env_int(name: str, default: int) -> int:
@@ -234,6 +235,18 @@ def env_int(name: str, default: int) -> int:
         return default
     try:
         return int(value)
+    except ValueError:
+        return default
+
+
+def env_float(name: str, default: float) -> float:
+    """Return a float override supplied via environment variables."""
+
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    try:
+        return float(value)
     except ValueError:
         return default
 
