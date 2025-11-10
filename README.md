@@ -31,11 +31,11 @@ FasterViT: fake (97.33% confidence)
   <tr>
     <td>
       <p><strong>Input Image</strong></p>
-      <img src="images/mark-zuckerberg-deepfake.webp" alt="Mark Zuckerberg Deepfake" width="361" height="224"/>
+      <img src="docs/images/mark-zuckerberg-deepfake.webp" alt="Mark Zuckerberg Deepfake" width="361" height="224"/>
     </td>
     <td>
       <p><strong>Heatmap Visualization</strong></p>
-      <img src="images/mark-zuckerberg-deepfake-heatmap.png" alt="Heatmap of Mark Zuckerberg Deepfake" width="224" height="224"/>
+      <img src="docs/images/mark-zuckerberg-deepfake-heatmap.png" alt="Heatmap of Mark Zuckerberg Deepfake" width="224" height="224"/>
     </td>
   </tr>
 </table>
@@ -50,11 +50,11 @@ FasterViT: real (98.55% confidence)
   <tr>
     <td>
       <p><strong>Input Image</strong></p>
-      <img src="images/donald-trump-real.jpg" alt="Donald Trump Real" width="301" height="224"/>
+      <img src="docs/images/donald-trump-real.jpg" alt="Donald Trump Real" width="301" height="224"/>
     </td>
     <td>
       <p><strong>Heatmap Visualization</strong></p>
-      <img src="images/donald-trump-real-heatmap.png" alt="Heatmap of Donald Trump Real" width="224" height="224"/>
+      <img src="docs/images/donald-trump-real-heatmap.png" alt="Heatmap of Donald Trump Real" width="224" height="224"/>
     </td>
   </tr>
 </table>
