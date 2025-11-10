@@ -192,9 +192,9 @@ def build_env_overrides(
     All trainers should read training hyperparameters from these env vars; the
     orchestrator is the source of truth.
     """
-        data_cfg = config.get("data") or {}
-        train_cfg = model_cfg.get("training") or {}
-        infer_cfg = model_cfg.get("inference") or {}
+    data_cfg = config.get("data") or {}
+    train_cfg = model_cfg.get("training") or {}
+    infer_cfg = model_cfg.get("inference") or {}
     overrides: dict[str, str] = {"OUTPUT_DIR": str(run_paths.run_dir)}
 
     seed = config.get("seed")
