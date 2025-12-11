@@ -483,11 +483,11 @@ def _run_inference_job(
                 .lower()
             )
             if ans in {"Y", "y"}:
-                url_base = "https://github.com/thourihan/DeepfakeDetection/releases/download/v0.2.0/"
+                url_base = "https://github.com/thourihan/DeepfakeDetection/releases/download/v0.3.0/"
                 name_map = {
-                    "efficientnet_b3": "EfficientNet_10_21_2025.pth",
-                    "efficientformerv2_s1": "EfficientFormerV2_S1.pth",
-                    "faster_vit_2_224": "FasterVit_10_20_2025.pth",
+                    "efficientnet_b3": "efficientnet_b3_v0.3.0.pth",
+                    "efficientformerv2_s1": "efficientformerv2_s1_v0.3.0.pth",
+                    "faster_vit_2_224": "faster_vit_2_224_v0.3.0.pth",
                 }
                 if model_cfg["name"] in name_map:
                     weights_path.parent.mkdir(parents=True, exist_ok=True)
