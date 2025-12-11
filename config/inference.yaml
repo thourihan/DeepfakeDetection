@@ -17,7 +17,7 @@ models:
         val_resize: true
         val_center_crop: true
     inference:
-      weights: weights/EfficientNet_10_21_2025.pth
+      weights: weights/efficientnet_b3.pth
       split: test
       batch_size: 256
       num_workers: 2
@@ -30,7 +30,7 @@ models:
         val_resize: true
         val_center_crop: true
     inference:
-      weights: weights/EfficientFormerV2_S1.pth
+      weights: weights/efficientformerv2_s1.pth
       split: test
       batch_size: 256
       num_workers: 4
@@ -43,7 +43,7 @@ models:
         val_resize: true
         val_center_crop: true
     inference:
-      weights: weights/FasterViT_10_20_2025.pth
+      weights: weights/faster_vit_2_224.pth
       split: test
       batch_size: 256
       num_workers: 4
