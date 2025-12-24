@@ -62,8 +62,29 @@ models:
       batch_size: 64
       num_workers: 8
       resume: auto
+  repvit_m1:
+    output_dir: runs/repvit_m1
+    transforms:
+      train:
+        ensure_rgb: true
+        train_random_resized_crop: true
+        train_random_horizontal_flip: true
+        train_color_jitter: true
+        train_random_erasing: true
+      eval:
+        ensure_rgb: true
+        val_resize: true
+        val_center_crop: true
+    training:
+      epochs: 5
+      batch_size: 128
+      num_workers: 8
+      resume: auto
+      lr: 0.0002
+      weight_decay: 0.05
 
 selection:
-  - efficientnet_b3
-  - efficientformerv2_s1
-  - faster_vit_2_224
+  # - efficientnet_b3
+  # - efficientformerv2_s1
+  # - faster_vit_2_224
+  - repvit_m1

@@ -39,6 +39,9 @@ def _build_efficientnet(_: str, num_classes: int) -> nn.Module:
 def _build_efficientformer(model_name: str, num_classes: int) -> nn.Module:
     return timm.create_model(model_name, pretrained=False, num_classes=num_classes)
 
+def _build_repvit(model_name: str, num_classes: int) -> nn.Module:
+    return timm.create_model(model_name, pretrained=False, num_classes=num_classes)
+
 
 def _build_fastervit(model_name: str, num_classes: int) -> nn.Module:
     model = create_model(model_name, pretrained=False)
@@ -72,6 +75,14 @@ _PREFIX_SPECS: dict[str, ModelSpec] = {
         default_image_size=224,
         builder=_build_fastervit,
     ),
+    "repvit": ModelSpec(
+        name="repvit_m1",
+        train_module="trainers.repvit",
+        weights_key="repvit_m1",
+        default_image_size=224,
+        builder=_build_repvit,
+    ),
+
 }
 
 
