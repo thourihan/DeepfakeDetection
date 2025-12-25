@@ -1,90 +1,68 @@
+# Global experiment settings
 seed: 1
 device: cuda
 
 data:
-  root: data/mini_deepfake_dataset
+  root: data/frames
   train_split: train
   val_split: val
+  test_split: test
   num_classes: 2
   img_size: 224
 
-models:
-  efficientnet_b3:
-    output_dir: runs/efficientnet_b3
-    transforms:
-      train:
-        ensure_rgb: true
-        train_random_resized_crop: true
-        train_random_horizontal_flip: true
-        train_random_rotation: true
-        train_color_jitter: true
-        train_random_erasing: true
-      eval:
-        ensure_rgb: true
-        val_resize: true
-        val_center_crop: true
-    training:
-      epochs: 5
-      batch_size: 64
-      num_workers: 4
-      resume: auto
-  efficientformerv2_s1:
-    output_dir: runs/efficientformerv2_s1
-    transforms:
-      train:
-        ensure_rgb: true
-        train_random_resized_crop: true
-        train_random_horizontal_flip: true
-        train_color_jitter: true
-      eval:
-        ensure_rgb: true
-        val_resize: true
-        val_center_crop: true
-    training:
-      epochs: 5
-      batch_size: 128
-      num_workers: 8
-      resume: auto
-  faster_vit_2_224:
-    output_dir: runs/faster_vit_2_224
-    transforms:
-      train:
-        ensure_rgb: true
-        train_random_resized_crop: true
-        train_random_horizontal_flip: true
-        train_color_jitter: true
-      eval:
-        ensure_rgb: true
-        val_resize: true
-        val_center_crop: true
-    training:
-      epochs: 5
-      batch_size: 64
-      num_workers: 8
-      resume: auto
-  repvit_m1:
-    output_dir: runs/repvit_m1
-    transforms:
-      train:
-        ensure_rgb: true
-        train_random_resized_crop: true
-        train_random_horizontal_flip: true
-        train_color_jitter: true
-        train_random_erasing: true
-      eval:
-        ensure_rgb: true
-        val_resize: true
-        val_center_crop: true
-    training:
-      epochs: 5
-      batch_size: 128
-      num_workers: 8
-      resume: auto
-      lr: 0.0002
-      weight_decay: 0.05
+defaults:
+  model:
+    kind: timm
+    pretrained: true
+  training:
+    epochs: 5
+    batch_size: 64
+    num_workers: 8
+    lr: 1.0e-4
+    weight_decay: 5.0e-2
+    resume: auto
+  inference:
+    batch_size: 64
+    num_workers: 4
+  transforms:
+    train:
+      random_resized_crop: true
+      random_flip: true
+      color_jitter: true
+    eval:
+      resize: true
+      center_crop: true
 
+# Per-model configuration
+models:
+  repvit_m1:
+    model:
+      id: repvit_m1.dist_in1k
+    training:
+      epochs: 8
+
+  efficientformerv2_s1:
+    model:
+      id: efficientformerv2_s1
+    training:
+      epochs: 6
+
+  faster_vit_2_224:
+    model:
+      id: faster_vit_2_224
+    training:
+      epochs: 6
+      batch_size: 48
+
+  efficientnet_b3:
+    model:
+      id: efficientnet_b3
+    training:
+      epochs: 8
+
+# Which models to run
 selection:
-  # - efficientnet_b3
-  # - efficientformerv2_s1
-  # - faster_vit_2_224
   - repvit_m1
+  - efficientformerv2_s1
+  - faster_vit_2_224
+  - efficientnet_b3

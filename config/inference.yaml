@@ -2,54 +2,49 @@ seed: 1
 device: cuda
 
 data:
-  root: data/mini_deepfake_dataset
+  root: data/deepfake_dataset
   test_split: test
-  val_split: val
   num_classes: 2
   img_size: 224
 
+defaults:
+  model:
+    kind: timm
+    pretrained: false
+  inference:
+    batch_size: 64
+    num_workers: 4
+  transforms:
+    eval:
+      resize: true
+      center_crop: true
+
 models:
-  efficientnet_b3:
-    output_dir: runs/efficientnet_b3
-    transforms:
-      eval:
-        ensure_rgb: true
-        val_resize: true
-        val_center_crop: true
+  repvit_m1:
+    model:
+      id: repvit_m1.dist_in1k
     inference:
-      weights: weights/efficientnet_b3.pth
-      split: test
-      batch_size: 256
-      num_workers: 2
-      img_size: 224
+      weights: weights/repvit_m1.pth
+
   efficientformerv2_s1:
-    output_dir: runs/efficientformerv2_s1
-    transforms:
-      eval:
-        ensure_rgb: true
-        val_resize: true
-        val_center_crop: true
+    model:
+      id: efficientformerv2_s1
     inference:
       weights: weights/efficientformerv2_s1.pth
-      split: test
-      batch_size: 256
-      num_workers: 4
-      img_size: 224
   faster_vit_2_224:
-    output_dir: runs/faster_vit_2_224
-    transforms:
-      eval:
-        ensure_rgb: true
-        val_resize: true
-        val_center_crop: true
+    model:
+      id: faster_vit_2_224
     inference:
       weights: weights/faster_vit_2_224.pth
-      split: test
-      batch_size: 256
-      num_workers: 4
-      img_size: 224
+
+  efficientnet_b3:
+    model:
+      id: efficientnet_b3
+    inference:
+      weights: weights/efficientnet_b3.pth
 
 selection:
-  - efficientnet_b3
+  - repvit_m1
   - efficientformerv2_s1
   - faster_vit_2_224
+  - efficientnet_b3

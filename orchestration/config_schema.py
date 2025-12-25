@@ -4,9 +4,10 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from .model_factory import ModelBuildConfig
+
 
 class DataConfig(BaseModel):
-    # data is fairly stable, so we can ignore extra keys here to stay backward-compatible
     model_config = ConfigDict(extra="ignore")
 
     root: str = Field(..., description="Root directory for the dataset.")
@@ -18,34 +19,43 @@ class DataConfig(BaseModel):
     class_labels: dict[str, str] | None = None
 
 
+class TrainingConfig(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    epochs: int = 10
+    batch_size: int = 64
+    num_workers: int = 4
+    lr: float = 1e-3
+    weight_decay: float = 1e-4
+    img_size: int | None = None
+    resume: str | bool | None = None
+    accum_steps: int | None = None
+    early_stop_patience: int | None = None
+
+
 class InferenceConfig(BaseModel):
-    # inference blocks tend to grow (extra options, transforms), so allow unknown keys
     model_config = ConfigDict(extra="allow")
 
     weights: str | None = None
     split: str | None = None
-    batch_size: int = 64
-    num_workers: int = 4
+    batch_size: int | None = None
+    num_workers: int | None = None
     img_size: int | None = None
-    transforms: dict[str, Any] | None = None
 
 
-class TrainingConfig(BaseModel):
-    # same idea as inference: different trainers may read different knobs
+class DefaultsConfig(BaseModel):
     model_config = ConfigDict(extra="allow")
 
-    batch_size: int = 64
-    epochs: int = 10
-    num_workers: int = 4
-    img_size: int | None = None
+    model: ModelBuildConfig | None = None
+    training: TrainingConfig | None = None
+    inference: InferenceConfig | None = None
     transforms: dict[str, Any] | None = None
-    resume: str | bool | None = None
 
 
 class ModelConfig(BaseModel):
-    # per-model blocks often have bespoke fields, so don't be strict here
     model_config = ConfigDict(extra="allow")
 
+    model: ModelBuildConfig
     output_dir: str | None = None
     transforms: dict[str, Any] | None = None
     training: TrainingConfig | None = None
@@ -55,19 +65,18 @@ class ModelConfig(BaseModel):
 
 
 class OrchestratorConfig(BaseModel):
-    # allow extra at the top level so we don't explode if YAML has comments/extra keys
     model_config = ConfigDict(extra="allow")
 
     seed: int | None = None
     device: str | None = None
     data: DataConfig
+    defaults: DefaultsConfig | None = None
     models: dict[str, ModelConfig]
     selection: list[str] | None = None
 
     @field_validator("models")
     @classmethod
     def _ensure_models_not_empty(cls, value: dict[str, ModelConfig]) -> dict[str, ModelConfig]:
-        # we never want to run train/inference with an empty models: block
         if not value:
             msg = "config.models cannot be empty"
             raise ValueError(msg)
@@ -77,11 +86,9 @@ class OrchestratorConfig(BaseModel):
     def _normalize_selection(self) -> OrchestratorConfig:
         models = self.models or {}
         if self.selection is None:
-            # default to 'all models' if user didn't specify selection
             self.selection = list(models.keys())
             return self
 
-        # user supplied a selection: make sure every name exists in models:
         missing = [name for name in self.selection if name not in models]
         if missing:
             msg = f"selection references unknown models: {', '.join(missing)}"
