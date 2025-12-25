@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -56,8 +56,12 @@ def load_config(path: Path) -> OrchestratorConfig:
 def merge_model_config(
     name: str, *, cfg: ModelConfig, defaults: DefaultsConfig | None, data_cfg: Any
 ) -> ResolvedModelConfig:
-    model_defaults = defaults.model.model_dump(exclude_unset=True) if defaults and defaults.model else {}
-    merged_model = ModelBuildConfig(**{**model_defaults, **cfg.model.model_dump(exclude_unset=True)})
+    def _clean_config_dict(config_obj: Any) -> dict[str, Any]:
+        raw = asdict(config_obj) if not hasattr(config_obj, "model_dump") else config_obj.model_dump(exclude_unset=True)
+        return {key: value for key, value in raw.items() if value is not None}
+
+    model_defaults = _clean_config_dict(defaults.model) if defaults and defaults.model else {}
+    merged_model = ModelBuildConfig(**{**model_defaults, **_clean_config_dict(cfg.model)})
 
     training_defaults = (
         defaults.training.model_dump(exclude_unset=True) if defaults and defaults.training else {}
