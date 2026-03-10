@@ -49,7 +49,11 @@ models:
 
   faster_vit_2_224:
     model:
-      id: faster_vit_2_224
+      kind: import
+      builder: orchestration.model_registry:build_fastervit
+      kwargs:
+        model_name: faster_vit_2_224
+        pretrained: true
     training:
       epochs: 6
       batch_size: 48

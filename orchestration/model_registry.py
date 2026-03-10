@@ -50,6 +50,21 @@ def _build_fastervit(model_name: str, num_classes: int) -> nn.Module:
     return model
 
 
+def build_fastervit(*, num_classes: int, model_name: str = "faster_vit_2_224", pretrained: bool = False) -> nn.Module:
+    """Public builder for FasterViT models.
+
+    The orchestrator's :func:`~orchestration.model_factory.build_model` helper
+    can call arbitrary builder functions via ``kind: import`` configs. This
+    wrapper makes FasterViT available through that pathway while keeping the
+    classification head sized for the configured number of classes.
+    """
+
+    model = create_model(model_name, pretrained=pretrained)
+    in_features = model.head.in_features  # type: ignore[attr-defined]
+    model.head = nn.Linear(in_features, num_classes)  # type: ignore[attr-defined]
+    return model
+
+
 _EXACT_SPECS: dict[str, ModelSpec] = {
     "efficientnet_b3": ModelSpec(
         name="efficientnet_b3",
