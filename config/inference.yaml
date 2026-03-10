@@ -2,7 +2,7 @@ seed: 1
 device: cuda
 
 data:
-  root: data/deepfake_dataset
+  root: data/deepfake_dataset_sample
   test_split: test
   num_classes: 2
   img_size: 224
@@ -11,6 +11,9 @@ defaults:
   model:
     kind: timm
     pretrained: false
+  training:
+    batch_size: 64
+    num_workers: 4
   inference:
     batch_size: 64
     num_workers: 4
@@ -31,9 +34,14 @@ models:
       id: efficientformerv2_s1
     inference:
       weights: weights/efficientformerv2_s1.pth
+
   faster_vit_2_224:
     model:
-      id: faster_vit_2_224
+      kind: import
+      builder: orchestration.model_registry:build_fastervit
+      kwargs:
+        model_name: faster_vit_2_224
+        pretrained: false
     inference:
       weights: weights/faster_vit_2_224.pth
 

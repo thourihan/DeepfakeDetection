@@ -20,7 +20,7 @@ class DataConfig(BaseModel):
 
 
 class TrainingConfig(BaseModel):
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="forbid")
 
     epochs: int = 10
     batch_size: int = 64
@@ -34,7 +34,7 @@ class TrainingConfig(BaseModel):
 
 
 class InferenceConfig(BaseModel):
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="forbid")
 
     weights: str | None = None
     split: str | None = None
@@ -44,7 +44,7 @@ class InferenceConfig(BaseModel):
 
 
 class DefaultsConfig(BaseModel):
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="forbid")
 
     model: ModelBuildConfig | None = None
     training: TrainingConfig | None = None
@@ -53,7 +53,7 @@ class DefaultsConfig(BaseModel):
 
 
 class ModelConfig(BaseModel):
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="forbid")
 
     model: ModelBuildConfig
     output_dir: str | None = None
@@ -65,7 +65,7 @@ class ModelConfig(BaseModel):
 
 
 class OrchestratorConfig(BaseModel):
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="ignore")
 
     seed: int | None = None
     device: str | None = None

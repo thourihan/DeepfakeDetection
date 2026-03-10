@@ -7,7 +7,6 @@ from typing import Any
 import torch
 from rich.console import Console
 from torch import nn, optim
-from torch.cuda.amp import GradScaler, autocast
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
@@ -39,7 +38,7 @@ class ModelRunConfig:
 # Data pipeline helpers
 # ---------------------------------------------------------------------------
 
-def _build_transforms(image_size: int, config: dict[str, Any] | None, *, train: bool) -> transforms.Compose:
+def build_transforms(image_size: int, config: dict[str, Any] | None, *, train: bool) -> transforms.Compose:
     defaults = {
         "ensure_rgb": True,
         "resize": True,
@@ -65,6 +64,8 @@ def _build_transforms(image_size: int, config: dict[str, Any] | None, *, train: 
         ops.append(transforms.CenterCrop(image_size))
     if resolved.get("random_flip"):
         ops.append(transforms.RandomHorizontalFlip())
+    if resolved.get("color_jitter"):
+        ops.append(transforms.ColorJitter(0.2, 0.2, 0.2, 0.05))
     if resolved.get("to_tensor"):
         ops.append(transforms.ToTensor())
     if resolved.get("normalize"):
@@ -85,8 +86,8 @@ def build_dataloaders(
     transforms_cfg: dict[str, Any] | None,
     num_classes: int,
 ) -> tuple[DataLoader, DataLoader]:
-    train_tf = _build_transforms(image_size, (transforms_cfg or {}).get("train"), train=True)
-    eval_tf = _build_transforms(image_size, (transforms_cfg or {}).get("eval"), train=False)
+    train_tf = build_transforms(image_size, (transforms_cfg or {}).get("train"), train=True)
+    eval_tf = build_transforms(image_size, (transforms_cfg or {}).get("eval"), train=False)
 
     train_ds = datasets.ImageFolder(data_root / train_split, transform=train_tf)
     val_ds = datasets.ImageFolder(data_root / val_split, transform=eval_tf)
@@ -94,13 +95,12 @@ def build_dataloaders(
     for split_name, dataset in ((train_split, train_ds), (val_split, val_ds)):
         classes = getattr(dataset, "classes", None)
         if classes is not None and len(classes) != num_classes:
-            msg = (
+            raise ValueError(
                 f"Split '{split_name}' exposes {len(classes)} classes but config expects {num_classes}. "
                 "Update config.data.num_classes to match the dataset."
             )
-            raise ValueError(msg)
 
-    common_loader_kwargs = {
+    common_loader_kwargs: dict[str, Any] = {
         "batch_size": batch_size,
         "num_workers": num_workers,
         "pin_memory": True,
@@ -127,9 +127,11 @@ def train_model(
     if run_context.seed is not None:
         torch.manual_seed(run_context.seed)
     device = run_context.device
+    use_cuda = device.type == "cuda"
 
     training_cfg = model_cfg.training
     image_size = training_cfg.img_size or infer_default_image_size(model_cfg.model)
+    early_stop_patience: int | None = getattr(training_cfg, "early_stop_patience", None)
 
     train_loader, val_loader = build_dataloaders(
         data_root=Path(data_cfg.root).expanduser(),
@@ -142,12 +144,16 @@ def train_model(
         num_classes=model_cfg.num_classes,
     )
 
-    model = build_model(model_cfg.model, model_cfg.num_classes).to(device)
+    model = build_model(model_cfg.model, model_cfg.num_classes)
+    if use_cuda:
+        model = model.to(memory_format=torch.channels_last)
+    model = model.to(device)
+
     optimizer = optim.AdamW(
         model.parameters(), lr=training_cfg.lr, weight_decay=training_cfg.weight_decay
     )
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=training_cfg.epochs)
-    scaler = GradScaler(enabled=device.type == "cuda")
+    scaler = torch.amp.GradScaler(enabled=use_cuda)
 
     ckpt = CheckpointManager(run_context, fingerprint=model_cfg.model_fingerprint)
     state = TrainerState()
@@ -161,6 +167,7 @@ def train_model(
             state.best_epoch = int(loaded.get("best_epoch", state.best_epoch))
             console.print(f"[green]✓ Resumed from[/] {ckpt.latest_path}")
 
+    epochs_no_improve = 0
     for epoch in range(start_epoch, training_cfg.epochs):
         state.epoch = epoch
         train_loss = _run_epoch(
@@ -178,6 +185,9 @@ def train_model(
         if is_best:
             state.best_metric = val_metrics["accuracy"]
             state.best_epoch = epoch
+            epochs_no_improve = 0
+        else:
+            epochs_no_improve += 1
 
         ckpt.save(
             epoch=epoch,
@@ -194,7 +204,15 @@ def train_model(
             f"[bold]{model_cfg.name}[/] epoch {epoch+1}/{training_cfg.epochs} "
             f"train_loss={train_loss:.4f} val_loss={val_metrics['loss']:.4f} "
             f"val_acc={val_metrics['accuracy']:.4f}"
+            + (f" [yellow](no improvement for {epochs_no_improve})[/]" if epochs_no_improve else "")
         )
+
+        if early_stop_patience is not None and epochs_no_improve >= early_stop_patience:
+            console.print(
+                f"[yellow]Early stopping[/]: no improvement for {early_stop_patience} epoch(s). "
+                f"Best val_acc={state.best_metric:.4f} at epoch {state.best_epoch + 1}."
+            )
+            break
 
     return {
         "best_accuracy": state.best_metric,
@@ -207,30 +225,43 @@ def _run_epoch(
     *,
     loader: DataLoader,
     optimizer: optim.Optimizer,
-    scaler: GradScaler,
+    scaler: torch.amp.GradScaler,
     device: torch.device,
     accum_steps: int,
 ) -> float:
     model.train()
     running_loss = 0.0
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
+    use_cuda = device.type == "cuda"
 
     optimizer.zero_grad(set_to_none=True)
+    pending = 0
     for step, (images, targets) in enumerate(loader, start=1):
         images = images.to(device, non_blocking=True)
+        if use_cuda:
+            images = images.to(memory_format=torch.channels_last)
         targets = targets.to(device, non_blocking=True)
 
-        with autocast(enabled=device.type == "cuda"):
+        with torch.amp.autocast(device_type=device.type, enabled=use_cuda):
             logits = model(images)
             loss = criterion(logits, targets) / accum_steps
 
         scaler.scale(loss).backward()
-        if step % accum_steps == 0:
+        pending += 1
+
+        if pending == accum_steps:
             scaler.step(optimizer)
             scaler.update()
             optimizer.zero_grad(set_to_none=True)
+            pending = 0
 
         running_loss += loss.item() * accum_steps
+
+    # Flush any remaining gradients if loader length is not divisible by accum_steps.
+    if pending > 0:
+        scaler.step(optimizer)
+        scaler.update()
+        optimizer.zero_grad(set_to_none=True)
 
     return running_loss / len(loader)
 
@@ -272,20 +303,21 @@ def run_inference(
         or infer_default_image_size(model_cfg.model)
     )
     transforms_cfg = model_cfg.transforms
-    eval_tf = _build_transforms(image_size, (transforms_cfg or {}).get("eval"), train=False)
+    eval_tf = build_transforms(image_size, (transforms_cfg or {}).get("eval"), train=False)
 
     split = model_cfg.inference.split or data_cfg.test_split
     dataset = datasets.ImageFolder(Path(data_cfg.root) / split, transform=eval_tf)
     if len(dataset) == 0:
-        msg = f"No images found under {dataset.root}"
-        raise FileNotFoundError(msg)
+        raise FileNotFoundError(f"No images found under {dataset.root}")
+
+    num_workers = model_cfg.inference.num_workers or model_cfg.training.num_workers
     loader = DataLoader(
         dataset,
         batch_size=model_cfg.inference.batch_size or model_cfg.training.batch_size,
         shuffle=False,
-        num_workers=model_cfg.inference.num_workers or model_cfg.training.num_workers,
+        num_workers=num_workers,
         pin_memory=True,
-        persistent_workers=(model_cfg.inference.num_workers or model_cfg.training.num_workers) > 0,
+        persistent_workers=num_workers > 0,
     )
 
     model = build_model(model_cfg.model, model_cfg.num_classes).to(device)
@@ -317,4 +349,4 @@ def run_inference(
     return {"accuracy": accuracy, "split": split}
 
 
-__all__ = ["ModelRunConfig", "train_model", "run_inference"]
+__all__ = ["ModelRunConfig", "build_transforms", "train_model", "run_inference"]
