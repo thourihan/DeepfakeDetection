@@ -1,0 +1,56 @@
+ (cd "$(git rev-parse --show-toplevel)" && git apply --3way <<'EOF' 
+diff --git a/config/train.yaml b/config/train.yaml
+index 8f4cfc947429bad45b3e3a3e6993a17040119842..b27847d5994c9503bdb66f03c6e532d07015f2b2 100644
+--- a/config/train.yaml
++++ b/config/train.yaml
+@@ -27,42 +27,46 @@ defaults:
+   transforms:
+     train:
+       random_resized_crop: true
+       random_flip: true
+       color_jitter: true
+     eval:
+       resize: true
+       center_crop: true
+ 
+ # Per-model configuration
+ models:
+   repvit_m1:
+     model:
+       id: repvit_m1.dist_in1k
+     training:
+       epochs: 8
+ 
+   efficientformerv2_s1:
+     model:
+       id: efficientformerv2_s1
+     training:
+       epochs: 6
+ 
+   faster_vit_2_224:
+     model:
+-      id: faster_vit_2_224
++      kind: import
++      builder: orchestration.model_registry:build_fastervit
++      kwargs:
++        model_name: faster_vit_2_224
++        pretrained: true
+     training:
+       epochs: 6
+       batch_size: 48
+ 
+   efficientnet_b3:
+     model:
+       id: efficientnet_b3
+     training:
+       epochs: 8
+ 
+ # Which models to run
+ selection:
+   - repvit_m1
+   - efficientformerv2_s1
+   - faster_vit_2_224
+   - efficientnet_b3
+ 
+EOF
+)
